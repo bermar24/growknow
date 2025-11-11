@@ -1,9 +1,9 @@
-import { Article, FilterParams } from "./types";
+import type { Article, FilterParams } from "./types";
 
-let cachedArticles: Article[] | null = null;
+let cachedArticles: Article[] = [];
 
 async function loadArticles(): Promise<Article[]> {
-  if (cachedArticles) return cachedArticles;
+  if (cachedArticles.length > 0) return cachedArticles;
 
   const response = await fetch("/data/articles.json");
   if (!response.ok) throw new Error("Failed to load articles");

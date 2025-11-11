@@ -19,6 +19,7 @@ export default function Footer() {
             <h4>Links</h4>
             <ul>
               <li><a href="/">Newsfeed</a></li>
+              <li><a href="/ai-tools">AI Tools</a></li>
               <li><a href="/sources">Sources</a></li>
               <li><a href="/about">About</a></li>
             </ul>
