@@ -1,3 +1,6 @@
+# Ignore IDE/editor and virtualenv folders
+.idea/
+.venv/
 # Ignore node modules
 node_modules/
 frontend/node_modules/
@@ -14,4 +17,3 @@ __pycache__/
 db.sqlite3
 # VSCode settings
 .vscode/
-
