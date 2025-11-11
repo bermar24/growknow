@@ -1,0 +1,17 @@
+# Ignore node modules
+node_modules/
+frontend/node_modules/
+# Ignore environment files
+.env
+frontend/.env
+# Optional local env overrides
+.env.local
+frontend/.env.local
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+# SQLite DB (Django)
+db.sqlite3
+# VSCode settings
+.vscode/
+
