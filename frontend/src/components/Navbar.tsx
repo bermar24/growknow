@@ -24,6 +24,7 @@ export default function Navbar({ onSearch, searchValue }: NavbarProps) {
 
         <div className="nav-links">
           <a href="/">Newsfeed</a>
+          <a href="/ai-tools">AI Tools</a>
           <a href="/sources">Sources</a>
           <a href="/about">About</a>
         </div>

@@ -1,4 +1,5 @@
-import { CATEGORIES, VENDORS, FilterParams } from "../lib/types";
+import type { FilterParams } from "../lib/types";
+import { CATEGORIES, VENDORS } from "../lib/types";
 
 interface FiltersProps {
   filters: FilterParams;

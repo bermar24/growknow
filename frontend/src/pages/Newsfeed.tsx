@@ -4,7 +4,7 @@ import Footer from "../components/Footer";
 import Filters from "../components/Filters";
 import ArticleCard from "../components/ArticleCard";
 import { listArticles } from "../lib/api";
-import { Article, FilterParams } from "../lib/types";
+import type { Article, FilterParams } from "../lib/types";
 
 export default function Newsfeed() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -49,8 +49,6 @@ export default function Newsfeed() {
     setFilters({ ...filters, page: nextPage });
   };
 
-  const currentPage = filters.page || 1;
-  const pageSize = 12;
   const hasMore = articles.length < total;
 
   return (

@@ -1,4 +1,4 @@
-import { Article } from "../lib/types";
+import type { Article } from "../lib/types";
 import { relativeTime } from "../lib/relativeTime";
 
 export default function ArticleCard({ article }: { article: Article }) {
