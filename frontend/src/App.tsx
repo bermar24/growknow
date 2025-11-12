@@ -4,6 +4,7 @@ import AITools from "./pages/AITools";
 import About from "./pages/About";
 import Sources from "./pages/Sources";
 import Admin from "./pages/Admin";
+import NotFound from "./pages/NotFound";
 import "./styles.css";
 
 function App() {
@@ -15,6 +16,8 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/sources" element={<Sources />} />
         <Route path="/admin" element={<Admin />} />
+        {/* Wildcard route: show client-side 404 for unmatched routes */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );
