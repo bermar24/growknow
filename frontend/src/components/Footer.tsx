@@ -28,9 +28,9 @@ export default function Footer() {
           <div className="footer-section">
             <h4>Legal</h4>
             <ul>
-              <li><a href="#privacy">Privacy</a></li>
-              <li><a href="#terms">Terms</a></li>
-              <li><a href="#imprint">Imprint</a></li>
+              <li><a href="/about#privacy">Privacy</a></li>
+              <li><a href="/about#terms">Terms</a></li>
+              <li><a href="/about#imprint">Imprint</a></li>
             </ul>
           </div>
         </div>
@@ -38,9 +38,8 @@ export default function Footer() {
         <div className="footer-bottom">
           <p>&copy; {year} GrowKnow. All rights reserved.</p>
           <div style={{ display: "flex", gap: "1.5rem" }}>
-            <a href="#">Twitter</a>
+            <a href="https://knowgrow7.wordpress.com/">Blog</a>
             <a href="https://github.com/bermar24/GrowKnow_Documentation">GitHub</a>
-            <a href="#">LinkedIn</a>
           </div>
         </div>
       </div>
