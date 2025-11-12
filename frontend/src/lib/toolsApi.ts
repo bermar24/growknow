@@ -2,14 +2,50 @@ import type { AITool } from "./toolsTypes";
 
 let cachedTools: AITool[] = [];
 
+// Helper: try to create a Supabase client dynamically
+async function getSupabaseClient() {
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+  if (!url || !key) return null;
+
+  try {
+    const mod = await import('@supabase/supabase-js');
+    const client = mod.createClient(url, key);
+    return client;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Supabase client not available; falling back to local JSON.', err);
+    return null;
+  }
+}
+
 async function loadTools(): Promise<AITool[]> {
   if (cachedTools.length > 0) return cachedTools;
 
-  const response = await fetch("/data/tools.json");
-  if (!response.ok) throw new Error("Failed to load tools");
+  const supabase = await getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('tools')
+        .select('*');
 
-  cachedTools = await response.json();
-  return cachedTools;
+      if (error) throw error;
+
+      cachedTools = (data as any[]) || [];
+      return cachedTools;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load tools from Supabase, falling back to local JSON', err);
+    }
+  }
+
+  try {
+    const mod = await import('../data/tools.json');
+    cachedTools = (mod as any).default || (mod as any);
+    return cachedTools as AITool[];
+  } catch (err) {
+    throw new Error('Failed to load local tools fallback: ' + String(err));
+  }
 }
 
 export interface ToolsFilterParams {
