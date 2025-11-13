@@ -26,8 +26,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Secret, debug, hosts from env
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-keep-this-out-of-prod')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
-
+# Robust parsing for ALLOWED_HOSTS:
+# Accept comma-separated hostnames or full URLs and extract hostname and host:port entries.
+import urllib.parse
+_allowed_raw = os.environ.get('DJANGO_ALLOWED_HOSTS')
+if _allowed_raw:
+    ALLOWED_HOSTS = []
+    for part in _allowed_raw.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        # If it's a full URL (http(s)://...), parse out hostname and optional port
+        if part.startswith('http://') or part.startswith('https://'):
+            parsed = urllib.parse.urlparse(part)
+            if parsed.hostname:
+                ALLOWED_HOSTS.append(parsed.hostname)
+                if parsed.port:
+                    ALLOWED_HOSTS.append(f"{parsed.hostname}:{parsed.port}")
+        else:
+            # Accept hostname or host:port or wildcard (e.g. .example.com)
+            ALLOWED_HOSTS.append(part.rstrip('/'))
+else:
+    ALLOWED_HOSTS = []
 
 # Application definition
 
@@ -47,6 +67,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -138,7 +159,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -154,8 +176,14 @@ _extra = os.environ.get('CORS_ALLOWED_ORIGINS')
 if _extra:
     for o in _extra.split(','):
         o = o.strip()
-        if o and o not in CORS_ALLOWED_ORIGINS:
-            CORS_ALLOWED_ORIGINS.append(o)
+        if not o:
+            continue
+        # If a full URL is provided, keep scheme+host (required by corsheaders),
+        # otherwise assume http scheme for convenience.
+        if o.startswith('http://') or o.startswith('https://'):
+            CORS_ALLOWED_ORIGINS.append(o.rstrip('/'))
+        else:
+            CORS_ALLOWED_ORIGINS.append(f'http://{o}')
 CORS_ALLOW_CREDENTIALS = True
 
 # DRF minimal configuration

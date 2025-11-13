@@ -43,3 +43,22 @@ class AuditLog(models.Model):
     def __str__(self):
         return f"{self.action} by {self.actor} at {self.timestamp}"
 
+
+# Tool model to store AI tools (mapped from frontend tools.json)
+class Tool(models.Model):
+    external_id = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    url = models.CharField(max_length=1000, blank=True)
+    logo = models.CharField(max_length=1000, blank=True)
+    category = models.CharField(max_length=255, blank=True)
+    subcategories = models.JSONField(default=list, blank=True)
+    pricing = models.CharField(max_length=100, blank=True)
+    price_from = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    rating = models.FloatField(null=True, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    raw_payload = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name

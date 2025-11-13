@@ -1,5 +1,14 @@
-dj-database-url
-psycopg2-binary
-djangorestframework
-django-cors-headers
-python-dotenv
+# Runtime requirements for the Django backend (used in production/runtime)
+Django==5.2.7
+djangorestframework==3.16.1
+django-cors-headers==4.9.0
+dj-database-url==3.0.1
+psycopg2-binary==2.9.11
+python-dotenv==1.2.1
+gunicorn>=20.1.0
+whitenoise>=6.5.0
+whitenoise>=6.5.0
+
+# Optional / commonly useful
+# Add other runtime dependencies here as needed
+

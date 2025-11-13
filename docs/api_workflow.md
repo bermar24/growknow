@@ -47,3 +47,96 @@ If you prefer to move the `news` app inside the `backend/` package (so files liv
 
 
 If you want, I’ll adapt the tests to be discovered by Django’s test runner (we can move test class name or run python manage.py test backend.news).
+
+# start backend
+python manage.py runserver
+
+# from frontend/
+npm install
+npm run dev
+
+start frontend
+
+# SQL schema for NewsArticle table
+CREATE TABLE public.news_newsarticle (
+id BIGSERIAL PRIMARY KEY,
+title VARCHAR(255) NOT NULL,
+content TEXT NOT NULL,
+source_link VARCHAR(500) NOT NULL,
+status VARCHAR(2) NOT NULL DEFAULT 'DR',
+created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+published_at TIMESTAMPTZ NULL,
+author_id BIGINT NULL,  -- optional reference to auth_user.id (no FK constraint here)
+relevance_score DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+industry_tags JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+ALTER TABLE public.news_newsarticle
+ADD CONSTRAINT news_newsarticle_status_check
+CHECK (status IN ('DR','PR','PB','ER'));
+
+--- 
+CREATE TABLE public.news_auditlog (
+id BIGSERIAL PRIMARY KEY,
+action VARCHAR(100) NOT NULL,
+timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+actor_id BIGINT NULL,      -- optional reference to auth_user.id
+article_id BIGINT NULL     -- optional reference to news_newsarticle.id
+);
+
+## insert into NewsArticle 
+INSERT INTO public.news_newsarticle
+(title, content, source_link, status, published_at, relevance_score, industry_tags)
+VALUES
+(
+'OpenAI Releases GPT-5 with Multimodal Reasoning',
+'OpenAI announces GPT-5, featuring advanced multimodal reasoning capabilities and improved context understanding.',
+'https://example.com/openai-gpt5',
+'PB',
+'2025-10-28T10:30:00+00',
+0.0,
+'["GPT-5","Language Model","Multimodal"]'::jsonb
+);
+
+# SQL schema for news_tool table
+CREATE TABLE public.news_tool (
+id BIGSERIAL PRIMARY KEY,
+external_id VARCHAR(64),
+name VARCHAR(255) NOT NULL,
+description TEXT,
+url VARCHAR(1000),
+logo VARCHAR(1000),
+category VARCHAR(255),
+subcategories JSONB NOT NULL DEFAULT '[]'::jsonb,
+pricing VARCHAR(100),
+price_from NUMERIC(10,2),
+rating DOUBLE PRECISION,
+tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+raw_payload JSONB,
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_tool_external_id ON public.news_tool(external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_news_tool_url_lower ON public.news_tool ((lower(url)));
+CREATE INDEX IF NOT EXISTS idx_news_tool_tags_gin ON public.news_tool USING GIN (tags);
+CREATE INDEX IF NOT EXISTS idx_news_tool_subcategories_gin ON public.news_tool USING GIN (subcategories);
+
+## insert into news_tool
+INSERT INTO public.news_tool
+(external_id, name, description, url, logo, category, subcategories, pricing, price_from, rating, tags)
+VALUES
+(
+'3',
+'Taskade',
+'AI-powered productivity workspace with task management, notes, and collaboration tools.',
+'https://taskade.com',
+'https://via.placeholder.com/60',
+'AI Productivity Tools',
+'["Task Management","Collaboration"]'::jsonb,
+'Freemium',
+8,
+4.3,
+'["Productivity","Tasks","Collaboration"]'::jsonb
+);
+
+

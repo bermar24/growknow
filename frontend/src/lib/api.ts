@@ -1,7 +1,26 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Normalize VITE_API_URL: allow developers to accidentally paste multiple values or comments.
+// We pick the first token that looks like a valid http(s) URL.
+function _normalizeApiUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  // Split on whitespace, commas, semicolons
+  const tokens = raw.split(/[\s;,]+/).map(t => t.trim()).filter(Boolean);
+  for (const t of tokens) {
+    if (/^https?:\/\//i.test(t)) return t.replace(/\/+$/, ''); // remove trailing slashes
+  }
+  return null;
+}
+
+const _rawApi = import.meta.env.VITE_API_URL as string | undefined;
+const _normalized = _normalizeApiUrl(_rawApi);
+export const API_BASE = _normalized || 'http://localhost:8000';
+if (!_normalized && _rawApi) {
+  // Warn once: developer provided an invalid VITE_API_URL
+  // eslint-disable-next-line no-console
+  console.warn('VITE_API_URL was present but could not be parsed as a valid URL. Falling back to', API_BASE, 'Original value:', _rawApi);
+}
 
 export async function fetchArticles() {
-    const res = await fetch(`${API_BASE}/api/articles/`);
+    const res = await fetch(`${API_BASE}/api/news/articles/`);
     if (!res.ok) {
         throw new Error(`API error: ${res.status}`);
     }
@@ -25,9 +44,9 @@ async function getSupabaseClient() {
     const client = mod.createClient(url, key);
     return client;
   } catch (err) {
-    // If the package isn't installed, warn and fall back to local JSON.
+    // If the package isn't installed, warn and fall back to backend API.
     // eslint-disable-next-line no-console
-    console.warn('Supabase client not available; falling back to local JSON.', err);
+    console.warn('Supabase client not available; falling back to backend API.', err);
     return null;
   }
 }
@@ -50,21 +69,21 @@ async function loadArticles(): Promise<Article[]> {
       cachedArticles = (data as any[]) || [];
       return cachedArticles;
     } catch (err) {
-      // If Supabase query fails, log and fall back to local JSON.
+      // If Supabase query fails, log and fall back to backend API.
       // eslint-disable-next-line no-console
-      console.error('Failed to load articles from Supabase, falling back to local JSON', err);
+      console.error('Failed to load articles from Supabase, falling back to backend API', err);
     }
   }
 
-  // Import the local JSON at build time (bundles in Vite). This avoids making a
-  // network request to /data/articles.json which may not exist in public/.
+  // Fetch from backend API
   try {
-    const mod = await import('../data/articles.json');
-    cachedArticles = (mod as any).default || (mod as any);
-    return cachedArticles as Article[];
+    const res = await fetch(`${API_BASE}/api/news/articles/`);
+    if (!res.ok) throw new Error('API fetch failed: ' + res.status);
+    const data = await res.json();
+    cachedArticles = data as Article[];
+    return cachedArticles;
   } catch (err) {
-    // If even the local JSON isn't available, throw a clear error.
-    throw new Error('Failed to load local articles fallback: ' + String(err));
+    throw new Error('Failed to load articles from backend API: ' + String(err));
   }
 }
 
