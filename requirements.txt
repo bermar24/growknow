@@ -1,14 +1,14 @@
-# Development / test dependencies (pinned for repeatable installs)
-Django==5.2.7
-behave==1.2.7
-behave-django==2.0.2
+# Top-level requirements manifest for the monorepo
+# This file used to contain a large flattened list of packages (many were desktop/Jupyter/system libs).
+# To keep frontend and backend concerns separated, we now split requirements:
+# - backend/requirements.txt (runtime requirements for the Django backend)
+# - backend/requirements-dev.txt (dev/test requirements for the backend)
+# - frontend/package.json (frontend deps managed by npm/yarn/pnpm)
 
-# Install with:
-# python -m venv .venv
-# source .venv/bin/activate
-#  pip install -r requirements.txt
+# To install backend runtime dependencies (recommended):
+#   pip install -r backend/requirements.txt
 
+# To install backend dev/test dependencies (recommended for local dev):
+#   pip install -r backend/requirements-dev.txt
 
-# python manage.py makemigrations news
-# python manage.py migrate
-# python manage.py behave
+# If you want to fully replicate the old environment, see the git history or ask to restore a monolithic file.

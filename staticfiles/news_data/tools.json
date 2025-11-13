@@ -1,0 +1,41 @@
+[
+  {
+    "id": "1",
+    "name": "AdCreative.ai",
+    "description": "Generate conversion-focused ad creatives and social media posts in seconds using AI.",
+    "url": "https://adcreative.ai",
+    "logo": "https://via.placeholder.com/60",
+    "category": "AI For Business",
+    "subcategories": ["Marketing", "Image Generation"],
+    "pricing": "Trial",
+    "priceFrom": 15,
+    "rating": 4.5,
+    "tags": ["Marketing", "Ads", "Image Generation"]
+  },
+  {
+    "id": "2",
+    "name": "Surfer",
+    "description": "SEO-optimized content creation tool powered by AI for better search rankings.",
+    "url": "https://surferseo.com",
+    "logo": "https://via.placeholder.com/60",
+    "category": "AI Text Generators",
+    "subcategories": ["SEO", "Content Writing"],
+    "pricing": "Trial",
+    "priceFrom": 69,
+    "rating": 4.7,
+    "tags": ["SEO", "Writing", "Content"]
+  },
+  {
+    "id": "3",
+    "name": "Taskade",
+    "description": "AI-powered productivity workspace with task management, notes, and collaboration tools.",
+    "url": "https://taskade.com",
+    "logo": "https://via.placeholder.com/60",
+    "category": "AI Productivity Tools",
+    "subcategories": ["Task Management", "Collaboration"],
+    "pricing": "Freemium",
+    "priceFrom": 8,
+    "rating": 4.3,
+    "tags": ["Productivity", "Tasks", "Collaboration"]
+  }
+  ]

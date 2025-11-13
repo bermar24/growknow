@@ -1,0 +1,48 @@
+[
+  {
+    "id": "19",
+    "title": "xAI Releases Grok API for Developers",
+    "url": "https://example.com/grok-api",
+    "source": {
+      "name": "xAI News",
+      "url": "https://xai.com",
+      "favicon": "https://xai.com/favicon.ico"
+    },
+    "summary": "xAI opens Grok API access to developers, enabling integration of Grok capabilities into third-party applications.",
+    "tags": ["API", "Grok", "Developer Tools"],
+    "categories": ["Product", "Ecosystem"],
+    "vendors": ["xAI"],
+    "publishedAt": "2025-10-10T10:45:00Z"
+  },
+  {
+    "id": "20",
+    "title": "Cohere Announces Enterprise AI Platform",
+    "url": "https://example.com/cohere-platform",
+    "source": {
+      "name": "Cohere Blog",
+      "url": "https://cohere.com",
+      "favicon": "https://cohere.com/favicon.ico"
+    },
+    "summary": "Cohere launches a comprehensive enterprise AI platform with integrated tools for model deployment and monitoring.",
+    "tags": ["Enterprise", "Platform", "AI"],
+    "categories": ["Product", "Ecosystem"],
+    "vendors": ["Cohere"],
+    "publishedAt": "2025-10-09T14:15:00Z"
+  },
+  {
+    "id": "1",
+    "title": "OpenAI Releases GPT-5 with Multimodal Reasoning",
+    "url": "https://example.com/openai-gpt5",
+    "source": {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com",
+      "favicon": "https://openai.com/favicon.ico"
+    },
+    "summary": "OpenAI announces GPT-5, featuring advanced multimodal reasoning capabilities and improved context understanding.",
+    "tags": ["GPT-5", "Language Model", "Multimodal"],
+    "categories": ["Product", "Research"],
+    "vendors": ["OpenAI"],
+    "publishedAt": "2025-10-28T10:30:00Z"
+  }
+]
+

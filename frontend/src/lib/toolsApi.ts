@@ -1,4 +1,5 @@
 import type { AITool } from "./toolsTypes";
+import { API_BASE } from './api';
 
 let cachedTools: AITool[] = [];
 
@@ -14,7 +15,7 @@ async function getSupabaseClient() {
     return client;
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('Supabase client not available; falling back to local JSON.', err);
+    console.warn('Supabase client not available; falling back to backend API.', err);
     return null;
   }
 }
@@ -35,16 +36,19 @@ async function loadTools(): Promise<AITool[]> {
       return cachedTools;
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Failed to load tools from Supabase, falling back to local JSON', err);
+      console.error('Failed to load tools from Supabase, falling back to backend API', err);
     }
   }
 
+  // Fetch from backend API
   try {
-    const mod = await import('../data/tools.json');
-    cachedTools = (mod as any).default || (mod as any);
-    return cachedTools as AITool[];
+    const res = await fetch(`${API_BASE}/api/news/tools/`);
+    if (!res.ok) throw new Error('API fetch failed: ' + res.status);
+    const data = await res.json();
+    cachedTools = data as AITool[];
+    return cachedTools;
   } catch (err) {
-    throw new Error('Failed to load local tools fallback: ' + String(err));
+    throw new Error('Failed to load tools from backend API: ' + String(err));
   }
 }
 

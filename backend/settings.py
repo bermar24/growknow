@@ -11,22 +11,43 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+# Optionally load .env for local development (install python-dotenv if you want this)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+except Exception:
+    pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-z=#&^v_i^a1mhxl74@3$i^3z7x37qf42%mj!aytajm)n)rrjt)'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+# Secret, debug, hosts from env
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-secret-keep-this-out-of-prod')
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
+# Robust parsing for ALLOWED_HOSTS:
+# Accept comma-separated hostnames or full URLs and extract hostname and host:port entries.
+import urllib.parse
+_allowed_raw = os.environ.get('DJANGO_ALLOWED_HOSTS')
+if _allowed_raw:
+    ALLOWED_HOSTS = []
+    for part in _allowed_raw.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        # If it's a full URL (http(s)://...), parse out hostname and optional port
+        if part.startswith('http://') or part.startswith('https://'):
+            parsed = urllib.parse.urlparse(part)
+            if parsed.hostname:
+                ALLOWED_HOSTS.append(parsed.hostname)
+                if parsed.port:
+                    ALLOWED_HOSTS.append(f"{parsed.hostname}:{parsed.port}")
+        else:
+            # Accept hostname or host:port or wildcard (e.g. .example.com)
+            ALLOWED_HOSTS.append(part.rstrip('/'))
+else:
+    ALLOWED_HOSTS = []
 
 # Application definition
 
@@ -37,12 +58,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'news', # Your new app
+    'backend.news', # Your new app
     'behave_django', # The BDD framework
+    'rest_framework',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -72,14 +97,31 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database: prefer SUPABASE_DB_URL (Postgres) and fall back to sqlite
+SUPABASE_DB_URL = os.environ.get('SUPABASE_DB_URL')
+if SUPABASE_DB_URL:
+    try:
+        import dj_database_url
+        # ssl_require=True is helpful for hosted Postgres like Supabase
+        DATABASES = {
+            'default': dj_database_url.parse(SUPABASE_DB_URL, conn_max_age=600, ssl_require=True)
+        }
+    except Exception:
+        # If dj-database-url not installed locally, fall back to sqlite for local dev
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+
 
 
 # Password validation
@@ -117,8 +159,40 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_extra = os.environ.get('CORS_ALLOWED_ORIGINS')
+if _extra:
+    for o in _extra.split(','):
+        o = o.strip()
+        if not o:
+            continue
+        # If a full URL is provided, keep scheme+host (required by corsheaders),
+        # otherwise assume http scheme for convenience.
+        if o.startswith('http://') or o.startswith('https://'):
+            CORS_ALLOWED_ORIGINS.append(o.rstrip('/'))
+        else:
+            CORS_ALLOWED_ORIGINS.append(f'http://{o}')
+CORS_ALLOW_CREDENTIALS = True
+
+# DRF minimal configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ],
+}

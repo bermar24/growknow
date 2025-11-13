@@ -85,3 +85,22 @@ npm install
 # Start the dev server
 npm run dev
 ```
+# Backend 
+Quick start (from the project root):
+
+```bash
+# For local development: 
+#Use backend runtime requirements for deploying or running the backend server: 
+pip install -r backend/requirements.txt 
+
+#Use backend dev requirements when working on tests and features: 
+pip install -r backend/requirements-dev.txt 
+```
+# Testing
+```bash
+# run behave (recommended for behave-django) 
+python manage.py behave --settings=backend.settings 
+ 
+# run django dev server 
+python manage.py runserver 
+```
