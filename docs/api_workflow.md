@@ -1,0 +1,49 @@
+# API workflow and project structure
+
+This document explains how the frontend, backend, and `news` app interact, plus recommended reorganization steps for deployment to Vercel and Supabase.
+
+Overview
+- Frontend: the React + Vite app under `/frontend`. It runs separately and calls the backend API using environment variable `VITE_API_URL`.
+- Backend: the Django project in `/backend`. It exposes a REST API using Django REST Framework and currently hosts the `news` app.
+- news: a Django app implementing the `NewsArticle` model, serializers, and views. It provides a read-only (currently) API surface for articles.
+
+Current wiring
+- The frontend's `src/lib/api.ts` reads `VITE_API_URL` (defaults to `http://localhost:8000`) and can call endpoints such as `${API_BASE}/api/news/articles/`.
+- The Django project mounts the `news` app under `/api/news/` (so articles are at `/api/news/articles/`).
+- The backend reads `SUPABASE_DB_URL` to connect to the Supabase (Postgres) database when deployed. Locally it falls back to SQLite.
+
+Why there are three folders
+- `frontend`: UI code and client-side data access. This is deployed as a static site (Vite build) on Vercel.
+- `backend`: Django server that provides API endpoints, admin, and connects to the database.
+- `news`: a Django app inside `backend` that groups news-related models, serializers, and views. It's not a separate backend; it's part of the Django backend.
+
+Recommended structure and goals
+1. Keep `frontend/` as a standalone static app that calls the backend API (hosted separately) or the same origin if you use a serverless function.
+2. Keep `backend/` as a Django project. Move Django apps (`news`) inside `backend/` if you prefer a single Python package layout (current layout is fine: `news` is top-level Django app alongside `backend`—optionally move into `backend/` package).
+3. Configure CORS and environment variables so Vercel-hosted frontend can call the backend.
+4. Ensure the backend uses `SUPABASE_DB_URL` to connect to Supabase in production and create a `.env` or set Vercel environment variables accordingly.
+
+Deployment notes (Vercel + Supabase)
+- Frontend: deploy the `frontend` directory on Vercel. Set environment variables in Vercel:
+  - VITE_API_URL -> https://<your-backend-url> (pointing to your backend deployment or serverless function)
+  - VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY if you use Supabase directly from the frontend.
+
+- Backend: deploy Django separately (e.g., Render, Fly, Railway) or convert Django API to serverless functions (more work). Configure environment variables:
+  - DJANGO_SECRET_KEY
+  - DJANGO_DEBUG=false
+  - SUPABASE_DB_URL=postgres://user:pass@host:port/dbname
+  - CORS_ALLOWED_ORIGINS (include your Vercel site URL)
+
+API endpoints
+- GET /api/news/articles/  -> list articles
+- GET /api/news/articles/{id}/ -> article detail
+
+Next steps I will perform now
+- Add a `.env.example` showing relevant env vars.
+- Add `README.md` summary in project root with short deployment instructions.
+- Run `python manage.py check` to verify Django imports and routing are valid.
+
+If you prefer to move the `news` app inside the `backend/` package (so files live at `backend/news/`) I can move files and update imports—tell me if you prefer that layout.
+
+
+If you want, I’ll adapt the tests to be discovered by Django’s test runner (we can move test class name or run python manage.py test backend.news).

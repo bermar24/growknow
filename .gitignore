@@ -7,9 +7,11 @@ frontend/node_modules/
 # Ignore environment files
 .env
 frontend/.env
+backend/.env
 # Optional local env overrides
 .env.local
 frontend/.env.local
+backend/.env.local
 # Byte-compiled / cache
 __pycache__/
 *.py[cod]
