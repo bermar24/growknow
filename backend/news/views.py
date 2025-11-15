@@ -2,7 +2,6 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from .models import NewsArticle, Tool
 from .serializers import NewsArticleSerializer, ToolSerializer
-from django.conf import settings
 import json
 from pathlib import Path
 from rest_framework.decorators import api_view
@@ -122,7 +121,9 @@ class ToolsDetailView(APIView):
     def get(self, request, pk=None):
         # Try DB first
         try:
-            tool = Tool.objects.filter(external_id=str(pk)).first() or Tool.objects.filter(id=pk).first()
+            # Prefer lookup by primary key `id`. External IDs are deprecated and may not
+            # be present in the DB, so avoid relying on them.
+            tool = Tool.objects.filter(id=pk).first()
             if tool:
                 serializer = ToolSerializer(tool)
                 return Response(serializer.data)

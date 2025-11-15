@@ -12,7 +12,24 @@ class ArticleStatus(models.TextChoices):
 class NewsArticle(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
-    source_link = models.URLField(max_length=500)
+
+    # Keep the model attribute named `source_link` for compatibility inside the
+    # project, but map it to the database column named `url` (this matches the
+    # existing Supabase table). Using `db_column='url'` prevents Django from
+    # creating a separate `source_link` column and makes ORM reads/writes use
+    # the `url` column in the DB.
+    source_link = models.URLField(max_length=500, db_column='url')
+
+    # New column: store the original source URL explicitly as `source_url`.
+    # We keep `source_link` for backwards compatibility with older migrations/code,
+    # but automation injecting articles should write to `source_url` per the
+    # user's preference. This field is nullable so adding it won't require a
+    # data migration for existing rows.
+    source_url = models.URLField(max_length=500, null=True, blank=True)
+
+    # Optional stored source metadata (new)
+    source_name = models.CharField(max_length=255, null=True, blank=True)
+    source_favicon = models.CharField(max_length=500, null=True, blank=True)
 
     # State tracking
     status = models.CharField(
@@ -29,6 +46,10 @@ class NewsArticle(models.Model):
     # Fields related to your AI processing (to be populated by n8n/Python workers)
     relevance_score = models.FloatField(default=0.0)
     industry_tags = models.JSONField(default=list)
+    # Store categories and vendors as JSON arrays to match `articles.json` structure.
+    # These are optional and default to empty lists so adding them is non-destructive.
+    categories = models.JSONField(default=list, blank=True)
+    vendors = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return self.title
@@ -46,7 +67,6 @@ class AuditLog(models.Model):
 
 # Tool model to store AI tools (mapped from frontend tools.json)
 class Tool(models.Model):
-    external_id = models.CharField(max_length=64, blank=True, null=True, unique=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     url = models.CharField(max_length=1000, blank=True)
