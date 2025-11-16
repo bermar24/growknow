@@ -93,9 +93,6 @@ Quick start (from the project root):
 #Use backend runtime requirements for deploying or running the backend server: 
 pip install -r backend/requirements.txt 
 
-#Use backend dev requirements when working on tests and features: 
-pip install -r backend/requirements-dev.txt 
-```
 # Testing
 ```bash
 # run behave (recommended for behave-django) 
