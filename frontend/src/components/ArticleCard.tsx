@@ -1,13 +1,26 @@
 import type { Article } from "../lib/types";
 import { relativeTime } from "../lib/relativeTime";
 
+function hostFallback(url?: string) {
+  if (!url) return 'source';
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '');
+  } catch (e) {
+    return url;
+  }
+}
+
 export default function ArticleCard({ article }: { article: Article }) {
+  const sourceName = article?.source?.name || hostFallback(article?.source?.url);
+  const favicon = article?.source?.favicon || '/logo.png';
+
   return (
     <article className="article-card">
       <div className="article-header">
         <div className="article-source">
-          <img src={article.source.favicon || "/logo.png"} alt={article.source.name} />
-          <span>{article.source.name}</span>
+          <img src={favicon} alt={sourceName} />
+          <span>{sourceName}</span>
         </div>
         <span className="article-time">{relativeTime(article.publishedAt)}</span>
       </div>

@@ -8,7 +8,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--file', type=str, help='Path to tools.json (optional)')
-        parser.add_argument('--force', action='store_true', help='Re-import and overwrite existing tools with same url or external_id')
+        parser.add_argument('--force', action='store_true', help='Re-import and overwrite existing tools with same url')
 
     def handle(self, *args, **options):
         file_path = options['file'] or Path(__file__).resolve().parent.parent.parent / 'static' / 'news_data' / 'tools.json'
@@ -30,7 +30,8 @@ class Command(BaseCommand):
         created = 0
         updated = 0
         for idx, item in enumerate(items, start=1):
-            external_id = str(item.get('id')) if item.get('id') is not None else None
+            # external_id is deprecated; ignore incoming JSON `id` and dedupe by URL only
+            external_id = None
             name = item.get('name')
             description = item.get('description') or ''
             url = item.get('url') or ''
@@ -42,17 +43,14 @@ class Command(BaseCommand):
             rating = item.get('rating')
             tags = item.get('tags') or []
 
-            self.stdout.write(f'Item {idx}/{total_items}: name={name!r} external_id={external_id!r} url={url!r}')
+            self.stdout.write(f'Item {idx}/{total_items}: name={name!r} url={url!r}')
 
             obj = None
-            # Prefer dedupe by external_id, then url
-            if external_id:
-                obj = Tool.objects.filter(external_id=external_id).first()
-            if not obj and url:
+            # Dedupe by URL only (external_id not used in this project)
+            if url:
                 obj = Tool.objects.filter(url=url).first()
 
             if obj and options.get('force'):
-                obj.external_id = external_id
                 obj.name = name
                 obj.description = description
                 obj.url = url
@@ -69,7 +67,6 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'  Updated tool id={obj.pk}'))
             elif not obj:
                 obj = Tool.objects.create(
-                    external_id=external_id,
                     name=name,
                     description=description,
                     url=url,
@@ -86,4 +83,3 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'  Created tool id={obj.pk}'))
 
         self.stdout.write(self.style.SUCCESS(f'Import complete. Created: {created}, Updated: {updated}'))
-

@@ -34,10 +34,59 @@ class NewsArticleSerializer(serializers.ModelSerializer):
         )
 
     def get_source(self, obj):
+        """
+        Return a small `source` dict for the frontend. Prefer stored `source_name` and
+        `source_favicon` when present (added as DB columns). Fall back to deriving a
+        human-friendly name and a favicon guess from the `source_url` (preferred) or
+        `source_link` URL.
+        """
+        # Prefer the new `source_url` field if present (automation will write here).
+        url = getattr(obj, 'source_url', None) or obj.source_link or ''
+        # Prefer explicit stored values if they exist
+        name = getattr(obj, 'source_name', None) or None
+        favicon = getattr(obj, 'source_favicon', None) or None
+
+        if not name and url:
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                host = (parsed.netloc or '').split(':')[0].lower()
+                host_clean = host.replace('www.', '')
+
+                # Small friendly map for common domains -> display names
+                host_map = {
+                    'openai.com': 'OpenAI',
+                    'deepmind.com': 'DeepMind',
+                    'anthropic.com': 'Anthropic',
+                    'mistral.ai': 'Mistral',
+                    'xai.com': 'xAI',
+                    'cohere.com': 'Cohere',
+                    'stability.ai': 'Stability AI',
+                    'techcrunch.com': 'TechCrunch',
+                    'venturebeat.com': 'VentureBeat',
+                    'europa.eu': 'EU Official Journal',
+                    'aisafety.org': 'AI Safety Institute',
+                    'ai.meta.com': 'Meta AI Blog',
+                    'meta.com': 'Meta',
+                }
+
+                name = host_map.get(host_clean)
+                if not name and host_clean:
+                    # fallback: use the first component of the hostname and capitalize it
+                    name = host_clean.split('.')[0].replace('-', ' ').title()
+
+                # default favicon guess (may not exist for all sites)
+                if not favicon:
+                    favicon = f"https://{host_clean}/favicon.ico" if host_clean else None
+            except Exception:
+                # keep name and favicon as None on any parse failure
+                name = name
+                favicon = favicon
+
         return {
-            'name': None,
-            'url': obj.source_link,
-            'favicon': None,
+            'name': name,
+            'url': url,
+            'favicon': favicon,
         }
 
     def get_categories(self, obj):
@@ -50,19 +99,10 @@ class NewsArticleSerializer(serializers.ModelSerializer):
 
 
 class ToolSerializer(serializers.ModelSerializer):
-    # map DB fields to frontend-friendly shape
-    id = serializers.CharField(source='external_id', allow_null=True)
-    name = serializers.CharField()
-    description = serializers.CharField()
-    url = serializers.CharField()
-    logo = serializers.CharField()
-    category = serializers.CharField()
-    subcategories = serializers.ListField(child=serializers.CharField())
-    pricing = serializers.CharField()
-    priceFrom = serializers.DecimalField(source='price_from', max_digits=10, decimal_places=2, coerce_to_string=False)
-    rating = serializers.FloatField()
-    tags = serializers.ListField(child=serializers.CharField())
+    # Use model PK `id` as API id. Map priceFrom -> price_from for frontend compatibility.
+    priceFrom = serializers.DecimalField(source='price_from', max_digits=10, decimal_places=2, coerce_to_string=False, required=False, allow_null=True)
 
     class Meta:
         model = Tool
-        fields = ('id','name','description','url','logo','category','subcategories','pricing','priceFrom','rating','tags')
+        # Expose model `id` (primary key) and other fields matching tools.json
+        fields = ('id', 'name', 'description', 'url', 'logo', 'category', 'subcategories', 'pricing', 'priceFrom', 'rating', 'tags')

@@ -43,6 +43,7 @@ def step_impl(context):
         title="Test Draft Article",
         content="This is content waiting for review.",
         source_link="http://test.com",
+        source_url="http://test.com",
         status=ArticleStatus.DRAFT,
         author=context.user
     )
@@ -59,6 +60,7 @@ def step_impl(context):
             title="Fallback Draft",
             content="Auto-created draft for test",
             source_link="http://test.example",
+            source_url="http://test.example",
             status=ArticleStatus.DRAFT,
             author=context.user
         )
@@ -237,6 +239,7 @@ def step_impl(context):
             title="Fallback Draft for Publish",
             content="Automatically created draft for test publish.",
             source_link="http://test.example",
+            source_url="http://test.example",
             status=ArticleStatus.DRAFT,
             author=getattr(context, 'user', None)
         )
