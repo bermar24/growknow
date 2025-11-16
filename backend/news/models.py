@@ -41,7 +41,11 @@ class NewsArticle(models.Model):
     # Audit and metadata
     created_at = models.DateTimeField(auto_now_add=True)
     published_at = models.DateTimeField(null=True, blank=True)
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='articles')
+
+    # AUTHOR: Changed to a simple text field stored in the existing `author`
+    # column in the database. This avoids FK/author_id mismatches and matches
+    # the Supabase table where `author` is stored as a (nullable) value.
+    author = models.CharField(max_length=255, null=True, blank=True, db_column='author')
 
     # Fields related to your AI processing (to be populated by n8n/Python workers)
     relevance_score = models.FloatField(default=0.0)
