@@ -22,12 +22,17 @@ class Command(BaseCommand):
             return
 
         author_user = None
+        author_value = None
         if options.get('author'):
+            # We'll store the username string in the article's `author` field. If a matching
+            # User exists locally we'll still note it (not used for storage) so the caller
+            # gets a warning if the username doesn't exist.
+            author_value = options['author']
             User = get_user_model()
             try:
                 author_user = User.objects.get(username=options['author'])
             except User.DoesNotExist:
-                self.stdout.write(self.style.WARNING(f"Author username '{options['author']}' not found; imported articles will have null author."))
+                self.stdout.write(self.style.WARNING(f"Author username '{options['author']}' not found; imported articles will have author='{author_value}' as text."))
 
         with open(file_path, 'r', encoding='utf-8') as f:
             try:
@@ -82,8 +87,8 @@ class Command(BaseCommand):
                         obj.published_at = published_at
                         obj.relevance_score = item.get('relevance_score', 0.0)
                         obj.industry_tags = industry_tags
-                        if author_user:
-                            obj.author = author_user
+                        if author_value:
+                            obj.author = author_value
                         obj.save()
                         updated += 1
                         self.stdout.write(self.style.SUCCESS(f'  Updated object id={obj.pk}'))
@@ -97,7 +102,7 @@ class Command(BaseCommand):
                     source_link=source_link,
                     status=ArticleStatus.PUBLISHED if published_at else ArticleStatus.DRAFT,
                     published_at=published_at,
-                    author=author_user,
+                    author=author_value,
                     relevance_score=item.get('relevance_score', 0.0),
                     industry_tags=industry_tags,
                 )

@@ -45,7 +45,7 @@ def step_impl(context):
         source_link="http://test.com",
         source_url="http://test.com",
         status=ArticleStatus.DRAFT,
-        author=context.user
+        author=(context.user.username if getattr(context, 'user', None) else None)
     )
     # Store it on the context for later use
     context.draft_article = article
@@ -62,7 +62,7 @@ def step_impl(context):
             source_link="http://test.example",
             source_url="http://test.example",
             status=ArticleStatus.DRAFT,
-            author=context.user
+            author=(context.user.username if getattr(context, 'user', None) else None)
         )
         context.draft_article = article
     assert hasattr(context, 'draft_article')
@@ -241,7 +241,7 @@ def step_impl(context):
             source_link="http://test.example",
             source_url="http://test.example",
             status=ArticleStatus.DRAFT,
-            author=getattr(context, 'user', None)
+            author=(getattr(context, 'user').username if getattr(context, 'user', None) else None)
         )
         context.draft_article = article
         context.draft_pk = article.pk
