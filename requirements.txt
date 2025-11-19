@@ -6,7 +6,7 @@
 # - frontend/package.json (frontend deps managed by npm/yarn/pnpm)
 
 # To install backend runtime dependencies (recommended):
-#   pip install -r backend/requirements.txt
+#pip install -r backend/requirements.txt
 
 # To install backend dev/test dependencies (recommended for local dev):
 #   pip install -r backend/requirements-dev.txt

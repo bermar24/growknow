@@ -62,11 +62,6 @@ Next steps I will perform now
 - Add `README.md` summary in project root with short deployment instructions.
 - Run `python manage.py check` to verify Django imports and routing are valid.
 
-If you prefer to move the `news` app inside the `backend/` package (so files live at `backend/news/`) I can move files
-and update imports—tell me if you prefer that layout.
-
-If you want, I’ll adapt the tests to be discovered by Django’s test runner (we can move test class name or run python
-manage.py test backend.news).
 
 # start backend
 
@@ -92,7 +87,7 @@ source_favicon varchar(500),
 status varchar(2) NOT NULL DEFAULT 'DR',
 created_at timestamptz NOT NULL DEFAULT now(),
 published_at timestamptz,
-author bigint, -- nullable; no FK to avoid cross-schema issues
+author bigint, -- nullable; 
 relevance_score double precision NOT NULL DEFAULT 0.0,
 industry_tags jsonb NOT NULL DEFAULT '[]'::jsonb,
 categories jsonb NOT NULL DEFAULT '[]'::jsonb,
