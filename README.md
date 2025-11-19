@@ -75,7 +75,33 @@ We welcome contributions!
 Open an issue or start a discussion in this repository.  
 
 
-# Frontend (frontend)
+
+## Testing (behave)
+Quick start (from the project root):
+
+```bash
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
+# Install dependencies
+pip install -r backend/requirements.txt 
+pip install behave behave-django # run behave (recommended for behave-django) 
+python manage.py behave --settings=backend.settings 
+```
+
+## Backend
+Quick start (from the project root):
+
+```bash
+# For local development: 
+#Use backend runtime requirements for deploying or running the backend server: 
+pip install -r backend/requirements.txt 
+
+# run django dev server 
+python manage.py runserver 
+```
+
+## Frontend (frontend)
 Quick start (from the project root):
 
 ```bash
@@ -84,20 +110,4 @@ cd frontend
 npm install 
 # Start the dev server
 npm run dev
-```
-# Backend 
-Quick start (from the project root):
-
-```bash
-# For local development: 
-#Use backend runtime requirements for deploying or running the backend server: 
-pip install -r backend/requirements.txt 
-
-# Testing
-```bash
-# run behave (recommended for behave-django) 
-python manage.py behave --settings=backend.settings 
- 
-# run django dev server 
-python manage.py runserver 
 ```
