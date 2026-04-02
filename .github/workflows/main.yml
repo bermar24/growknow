@@ -1,0 +1,40 @@
+name: BDD Tests
+
+# Triggers: on every Pull Request targeting main
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  behave-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create and activate venv, install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r backend/requirements.txt
+          pip install behave behave-django
+
+      - name: Run Behave tests
+        run: |
+          source .venv/bin/activate
+          python manage.py behave --settings=backend.settings
+
+# > ⚠️ **Note:** GitHub Actions runs each `run:` block in a fresh shell, which is why you need `source .venv/bin/activate` again before running Behave.
+
+## How the flow works
+ # Developer opens PR → GitHub Actions triggers → Behave runs .feature files
+ #        ↓                                                   ↓
+ #   PR is blocked                                     ✅ All pass
+ #   if tests fail                                     PR can be merged
