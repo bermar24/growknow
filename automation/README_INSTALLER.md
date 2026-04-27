@@ -10,7 +10,7 @@ bash install.sh
 ### Windows
 Double-click **install.bat**
 
-That's it. The installer handles everything automatically.
+That's it. The installer handles everything automatically. (or at least it should )
 
 ---
 

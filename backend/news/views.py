@@ -1,73 +1,73 @@
+from typing import Callable
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from .models import NewsArticle, Tool
-from .serializers import NewsArticleSerializer, ToolSerializer
-import json
-from pathlib import Path
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 
-# DB imports for robust fallback and health check
-from django.db import DatabaseError, OperationalError, connection
-from django.http import Http404
+from django.db import connection
 
-class NewsArticleViewSet(viewsets.ReadOnlyModelViewSet):
+from .models import NewsArticle, Tool
+from .serializers import NewsArticleSerializer, ToolSerializer
+from .services import ReadServiceFactory
+
+
+class ReadResponseFacade:
+    def __init__(self, read_service):
+        self.read_service = read_service
+
+    def list_response(self):
+        # SOLID (SRP): keep HTTP response formatting out of endpoint classes.
+        # Pattern (Facade): provide one small API for list/detail response building.
+        # Benefit: endpoints reuse one implementation instead of duplicating branches.
+        return Response(self.read_service.list_items())
+
+    def detail_response(self, pk: str):
+        item = self.read_service.get_item(pk)
+        if item is None:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(item)
+
+
+class ReadServiceMixin:
+    service_factory: Callable[[], object] | None = None
+
+    @property
+    def read_service(self):
+        if not hasattr(self, "_read_service"):
+            factory = type(self).service_factory
+            if factory is None:
+                raise NotImplementedError("service_factory must be defined")
+            # SOLID (DIP): endpoint code depends on the service abstraction, not concrete providers.
+            # Pattern (Factory Method): create dependencies through a factory callback.
+            # Benefit: swapping data sources is a local change in factory wiring.
+            # Access the factory through the class to avoid binding plain function objects as instance methods.
+            self._read_service = factory()
+        return self._read_service
+
+    @property
+    def response_facade(self):
+        if not hasattr(self, "_response_facade"):
+            self._response_facade = ReadResponseFacade(self.read_service)
+        return self._response_facade
+
+
+class NewsArticleViewSet(ReadServiceMixin, viewsets.ReadOnlyModelViewSet):
     """
     Read-only API for news articles. Change to ModelViewSet for full CRUD.
-    Falls back to static JSON files in backend/news/static/news_data/ when the DB is empty
-    or when a database error occurs.
     """
     queryset = NewsArticle.objects.all().order_by('-created_at')
     serializer_class = NewsArticleSerializer
+    service_factory = ReadServiceFactory.create_news_article_service
 
-    def _load_static_articles(self):
-        static_dir = Path(__file__).resolve().parent / 'static' / 'news_data'
-        file_path = static_dir / 'articles.json'
-        if file_path.exists():
-            with open(file_path, 'r', encoding='utf-8') as f:
-                try:
-                    data = json.load(f)
-                    return data
-                except Exception:
-                    return []
-        return []
-
+    # SOLID (OCP): behavior extensions now happen via service_factory/facade composition.
+    # Pattern (Facade + Factory Method): endpoint delegates response and dependency creation.
+    # Benefit: avoids duplicated retrieval/not-found logic in each endpoint class.
     def list(self, request, *args, **kwargs):
-        # Try DB first; fall back to static JSON if DB is empty or inaccessible
-        try:
-            qs_count = NewsArticle.objects.count()
-            if qs_count > 0:
-                return super().list(request, *args, **kwargs)
-        except (DatabaseError, OperationalError) as e:
-            # Database unavailable or error - fall back to static data
-            # In production you may want to log this exception
-            pass
-
-        # Otherwise fall back to static JSON
-        data = self._load_static_articles()
-        return Response(data)
+        return self.response_facade.list_response()
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        # Try DB first; if DB is down or object not found, try static fallback
-        try:
-            return super().retrieve(request, pk=pk, *args, **kwargs)
-        except Http404:
-            # Object not in DB; fall through to static fallback
-            pass
-        except (DatabaseError, OperationalError):
-            # DB error - fall back to static
-            pass
-        except Exception:
-            # For safety, try static fallback instead of exposing internal errors
-            pass
-
-        # Static fallback
-        data = self._load_static_articles()
-        for item in data:
-            # stored ids are strings in the frontend JSON; compare as str
-            if str(item.get('id')) == str(pk):
-                return Response(item)
-        return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        return self.response_facade.detail_response(str(pk))
 
 
 class ToolViewSet(viewsets.ReadOnlyModelViewSet):
@@ -76,66 +76,19 @@ class ToolViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ToolSerializer
 
 
-class ToolsListView(APIView):
+class ToolsListView(ReadServiceMixin, APIView):
     """Return list of tools from DB if available, otherwise fall back to static JSON."""
-    def _load_static_tools(self):
-        static_dir = Path(__file__).resolve().parent / 'static' / 'news_data'
-        file_path = static_dir / 'tools.json'
-        if file_path.exists():
-            with open(file_path, 'r', encoding='utf-8') as f:
-                try:
-                    data = json.load(f)
-                    return data
-                except Exception:
-                    return []
-        return []
+    service_factory = ReadServiceFactory.create_tools_service
 
     def get(self, request):
-        # Try DB first
-        try:
-            if Tool.objects.exists():
-                qs = Tool.objects.all().order_by('name')
-                serializer = ToolSerializer(qs, many=True)
-                return Response(serializer.data)
-        except (DatabaseError, OperationalError):
-            pass
-
-        # Otherwise fall back to static JSON
-        data = self._load_static_tools()
-        return Response(data)
+        return self.response_facade.list_response()
 
 
-class ToolsDetailView(APIView):
-    def _load_static_tools(self):
-        static_dir = Path(__file__).resolve().parent / 'static' / 'news_data'
-        file_path = static_dir / 'tools.json'
-        if file_path.exists():
-            with open(file_path, 'r', encoding='utf-8') as f:
-                try:
-                    data = json.load(f)
-                    return data
-                except Exception:
-                    return []
-        return []
+class ToolsDetailView(ReadServiceMixin, APIView):
+    service_factory = ReadServiceFactory.create_tools_service
 
     def get(self, request, pk=None):
-        # Try DB first
-        try:
-            # Prefer lookup by primary key `id`. External IDs are deprecated and may not
-            # be present in the DB, so avoid relying on them.
-            tool = Tool.objects.filter(id=pk).first()
-            if tool:
-                serializer = ToolSerializer(tool)
-                return Response(serializer.data)
-        except (DatabaseError, OperationalError):
-            pass
-
-        # Static fallback
-        data = self._load_static_tools()
-        for item in data:
-            if str(item.get('id')) == str(pk):
-                return Response(item)
-        return Response({'detail': 'Not found.'}, status=404)
+        return self.response_facade.detail_response(str(pk))
 
 
 # Health endpoint to check DB connectivity and basic app liveness

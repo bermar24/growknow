@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import NewsArticle, Tool
+from .adapters import SourceMetadataAdapter
 
 
 class NewsArticleSerializer(serializers.ModelSerializer):
@@ -34,60 +35,10 @@ class NewsArticleSerializer(serializers.ModelSerializer):
         )
 
     def get_source(self, obj):
-        """
-        Return a small `source` dict for the frontend. Prefer stored `source_name` and
-        `source_favicon` when present (added as DB columns). Fall back to deriving a
-        human-friendly name and a favicon guess from the `source_url` (preferred) or
-        `source_link` URL.
-        """
-        # Prefer the new `source_url` field if present (automation will write here).
-        url = getattr(obj, 'source_url', None) or obj.source_link or ''
-        # Prefer explicit stored values if they exist
-        name = getattr(obj, 'source_name', None) or None
-        favicon = getattr(obj, 'source_favicon', None) or None
-
-        if not name and url:
-            try:
-                from urllib.parse import urlparse
-                parsed = urlparse(url)
-                host = (parsed.netloc or '').split(':')[0].lower()
-                host_clean = host.replace('www.', '')
-
-                # Small friendly map for common domains -> display names
-                host_map = {
-                    'openai.com': 'OpenAI',
-                    'deepmind.com': 'DeepMind',
-                    'anthropic.com': 'Anthropic',
-                    'mistral.ai': 'Mistral',
-                    'xai.com': 'xAI',
-                    'cohere.com': 'Cohere',
-                    'stability.ai': 'Stability AI',
-                    'techcrunch.com': 'TechCrunch',
-                    'venturebeat.com': 'VentureBeat',
-                    'europa.eu': 'EU Official Journal',
-                    'aisafety.org': 'AI Safety Institute',
-                    'ai.meta.com': 'Meta AI Blog',
-                    'meta.com': 'Meta',
-                }
-
-                name = host_map.get(host_clean)
-                if not name and host_clean:
-                    # fallback: use the first component of the hostname and capitalize it
-                    name = host_clean.split('.')[0].replace('-', ' ').title()
-
-                # default favicon guess (may not exist for all sites)
-                if not favicon:
-                    favicon = f"https://{host_clean}/favicon.ico" if host_clean else None
-            except Exception:
-                # keep name and favicon as None on any parse failure
-                name = name
-                favicon = favicon
-
-        return {
-            'name': name,
-            'url': url,
-            'favicon': favicon,
-        }
+        # SOLID (SRP): keep serializer focused on field exposure, not URL parsing details.
+        # Pattern (Adapter): delegate source-shape conversion to SourceMetadataAdapter.
+        # Benefit: source mapping rules are reusable and easier to change in one place.
+        return SourceMetadataAdapter.from_article(obj)
 
     def get_categories(self, obj):
         # No categories on the model yet — return empty list for compatibility
