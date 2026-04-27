@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
-from pathlib import Path
-import json
+
 from backend.news.models import Tool
+from ._import_helpers import JsonImportFacade
 
 class Command(BaseCommand):
     help = "Import static tools from backend/news/static/news_data/tools.json into the Tool model."
@@ -11,18 +11,14 @@ class Command(BaseCommand):
         parser.add_argument('--force', action='store_true', help='Re-import and overwrite existing tools with same url')
 
     def handle(self, *args, **options):
-        file_path = options['file'] or Path(__file__).resolve().parent.parent.parent / 'static' / 'news_data' / 'tools.json'
-        file_path = Path(file_path)
-        if not file_path.exists():
-            self.stderr.write(self.style.ERROR(f'File not found: {file_path}'))
+        # SOLID (SRP): this command now focuses on mapping Tool fields, not JSON IO details.
+        # Pattern (Facade): JsonImportFacade centralizes shared file-path and parsing behavior.
+        # Benefit: easier maintenance when import file handling needs to change.
+        import_facade = JsonImportFacade(self)
+        file_path = import_facade.resolve_file_path(options['file'], 'tools.json')
+        items = import_facade.load_items(file_path)
+        if items is None:
             return
-
-        with open(file_path, 'r', encoding='utf-8') as f:
-            try:
-                items = json.load(f)
-            except Exception as e:
-                self.stderr.write(self.style.ERROR(f'Failed to parse JSON: {e}'))
-                return
 
         total_items = len(items) if isinstance(items, list) else 0
         self.stdout.write(self.style.NOTICE(f'Parsed {total_items} items from {file_path}'))

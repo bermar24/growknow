@@ -1,9 +1,9 @@
 from django.core.management.base import BaseCommand
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import get_user_model
-from pathlib import Path
-import json
+
 from backend.news.models import NewsArticle, ArticleStatus
+from ._import_helpers import JsonImportFacade
 
 
 class Command(BaseCommand):
@@ -15,11 +15,11 @@ class Command(BaseCommand):
         parser.add_argument('--force', action='store_true', help='Re-import and overwrite existing articles with same source_link')
 
     def handle(self, *args, **options):
-        file_path = options['file'] or Path(__file__).resolve().parent.parent.parent / 'static' / 'news_data' / 'articles.json'
-        file_path = Path(file_path)
-        if not file_path.exists():
-            self.stderr.write(self.style.ERROR(f'File not found: {file_path}'))
-            return
+        # SOLID (DRY + SRP): command keeps import rules while shared helper handles file plumbing.
+        # Pattern (Facade): one collaborator exposes resolve+load behavior used by multiple commands.
+        # Benefit: lower duplication and consistent error handling across imports.
+        import_facade = JsonImportFacade(self)
+        file_path = import_facade.resolve_file_path(options['file'], 'articles.json')
 
         author_user = None
         author_value = None
@@ -34,12 +34,9 @@ class Command(BaseCommand):
             except User.DoesNotExist:
                 self.stdout.write(self.style.WARNING(f"Author username '{options['author']}' not found; imported articles will have author='{author_value}' as text."))
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            try:
-                items = json.load(f)
-            except Exception as e:
-                self.stderr.write(self.style.ERROR(f'Failed to parse JSON: {e}'))
-                return
+        items = import_facade.load_items(file_path)
+        if items is None:
+            return
 
         # Diagnostic: show how many items were parsed
         total_items = len(items) if isinstance(items, list) else 0
