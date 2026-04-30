@@ -1,0 +1,40 @@
+# docker-compose.yml — n8n for NewsApp
+# Starts a local n8n instance with persistent data stored in ./n8n/data
+# n8n will be available at http://localhost:5678
+
+version: "3.8"
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: newsapp-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # ── Auth ──────────────────────────────────────────────────
+      N8N_BASIC_AUTH_ACTIVE: "false"        # We use the owner account instead
+      N8N_USER_MANAGEMENT_DISABLED: "false"
+
+      # ── Instance settings ─────────────────────────────────────
+      N8N_HOST: "localhost"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "http"
+      WEBHOOK_URL: "http://localhost:5678/"
+
+      # ── Timezone (adjust if needed) ───────────────────────────
+      GENERIC_TIMEZONE: "Europe/Berlin"
+
+      # ── Skip setup wizard so the REST API works immediately ───
+      N8N_SKIP_WEBHOOK_DEREGISTRATION_SHUTDOWN: "true"
+
+    volumes:
+      # Persist n8n data (workflows, credentials, executions)
+      - ./n8n/data:/home/node/.n8n
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s

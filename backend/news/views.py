@@ -29,7 +29,8 @@ class ReadResponseFacade:
         return Response(item)
 
 
-class ReadServiceMixin:
+class ServiceMixin:
+    """Mixin: handles service instance creation and caching via factory pattern."""
     service_factory: Callable[[], object] | None = None
 
     @property
@@ -45,6 +46,10 @@ class ReadServiceMixin:
             self._read_service = factory()
         return self._read_service
 
+
+class ResponseFacadeMixin(ServiceMixin):
+    """Mixin: manages response facade, depends on ServiceMixin for read_service."""
+
     @property
     def response_facade(self):
         if not hasattr(self, "_response_facade"):
@@ -52,7 +57,7 @@ class ReadServiceMixin:
         return self._response_facade
 
 
-class NewsArticleViewSet(ReadServiceMixin, viewsets.ReadOnlyModelViewSet):
+class NewsArticleViewSet(ResponseFacadeMixin, viewsets.ReadOnlyModelViewSet):
     """
     Read-only API for news articles. Change to ModelViewSet for full CRUD.
     """
@@ -76,7 +81,7 @@ class ToolViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ToolSerializer
 
 
-class ToolsListView(ReadServiceMixin, APIView):
+class ToolsListView(ResponseFacadeMixin, APIView):
     """Return list of tools from DB if available, otherwise fall back to static JSON."""
     service_factory = ReadServiceFactory.create_tools_service
 
@@ -84,7 +89,7 @@ class ToolsListView(ReadServiceMixin, APIView):
         return self.response_facade.list_response()
 
 
-class ToolsDetailView(ReadServiceMixin, APIView):
+class ToolsDetailView(ResponseFacadeMixin, APIView):
     service_factory = ReadServiceFactory.create_tools_service
 
     def get(self, request, pk=None):
