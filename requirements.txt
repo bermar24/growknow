@@ -10,8 +10,3 @@
 
 # To install backend dev/test dependencies (recommended for local dev):
 #   pip install -r backend/requirements-dev.txt
-
-# If you want to fully replicate the old environment, see the git history or ask to restore a monolithic file.
-
-radon
-lcom

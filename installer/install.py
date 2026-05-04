@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent   # project root (one level up fro
 BACKEND_DIR   = ROOT / "backend"
 FRONTEND_DIR  = ROOT / "frontend"
 N8N_DIR       = ROOT / "n8n"
+N8N_DATA_DIR  = N8N_DIR / "data"
 WORKFLOW_FILE = N8N_DIR / "workflow.json"
 VENV_DIR      = ROOT / ".venv"
 
@@ -87,6 +88,25 @@ def pip_bin() -> Path:
     if OS == "Windows":
         return VENV_DIR / "Scripts" / "pip.exe"
     return VENV_DIR / "bin" / "pip"
+
+def prepare_n8n_data_dir():
+    """Ensure the host bind-mount for n8n is writable before starting the container."""
+    step("Preparing n8n data directory...")
+    N8N_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    if OS == "Linux":
+        try:
+            os.chmod(N8N_DATA_DIR, 0o777)
+            for child in N8N_DATA_DIR.rglob("*"):
+                try:
+                    os.chmod(child, 0o777 if child.is_dir() else 0o666)
+                except OSError:
+                    pass
+            ok(f"n8n data directory is writable: {N8N_DATA_DIR}")
+        except OSError as e:
+            warn(f"Could not adjust permissions on {N8N_DATA_DIR}: {e}")
+    else:
+        ok(f"n8n data directory ready: {N8N_DATA_DIR}")
 
 # ── Phase 1: System Dependencies ─────────────────────────────────────────────
 
@@ -178,6 +198,8 @@ def start_n8n():
     if not compose_file.exists():
         fail(f"docker-compose.yml not found at {compose_file}")
 
+    prepare_n8n_data_dir()
+
     # docker compose v2 (plugin) vs v1 (standalone)
     compose_cmd = _docker_compose_cmd()
 
@@ -196,17 +218,46 @@ def _docker_compose_cmd():
 
 def wait_for_n8n():
     step(f"Waiting for n8n to be ready at {N8N_HOST} ...")
-    for attempt in range(40):
-        try:
-            req = urllib.request.urlopen(f"{N8N_HOST}/healthz", timeout=3)
-            if req.status == 200:
-                ok("n8n is up!")
-                return
-        except Exception:
-            pass
-        print(f"   ... attempt {attempt + 1}/40", end="\r")
+    compose_cmd = _docker_compose_cmd()
+
+    for attempt in range(60):
+        health = _n8n_container_health()
+        state = _n8n_container_state()
+
+        if health == "healthy" and _n8n_http_healthcheck():
+            ok("n8n is up!")
+            return
+
+        if state in {"exited", "dead"}:
+            warn(f"n8n container state is {state}; showing recent logs:")
+            run(compose_cmd + ["logs", "--no-color", "--tail=80", "n8n"], cwd=ROOT, check=False)
+            fail("n8n container exited before becoming ready. Check the logs above.")
+
+        print(f"   ... attempt {attempt + 1}/60 (container: {state or 'unknown'}, health: {health or 'unknown'})", end="\r")
         time.sleep(3)
-    fail("n8n did not become ready in time. Check: docker compose logs n8n")
+
+    warn("n8n did not become ready in time; showing recent logs:")
+    run(compose_cmd + ["logs", "--no-color", "--tail=80", "n8n"], cwd=ROOT, check=False)
+    fail("n8n did not become ready in time. Check the logs above.")
+
+def _n8n_http_healthcheck() -> bool:
+    try:
+        req = urllib.request.urlopen(f"{N8N_HOST}/healthz", timeout=3)
+        return req.status == 200
+    except Exception:
+        return False
+
+def _n8n_container_state() -> str:
+    result = run(["docker", "inspect", "newsapp-n8n", "--format", "{{.State.Status}}"], capture=True, check=False)
+    if result.returncode != 0:
+        return ""
+    return result.stdout.decode().strip()
+
+def _n8n_container_health() -> str:
+    result = run(["docker", "inspect", "newsapp-n8n", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{end}}"], capture=True, check=False)
+    if result.returncode != 0:
+        return ""
+    return result.stdout.decode().strip()
 
 def setup_n8n_owner():
     """POST to n8n's owner setup endpoint to create the default admin user."""
@@ -322,8 +373,8 @@ def create_desktop_shortcut():
         _create_shortcut_linux(desktop)
     elif OS == "Darwin":
         _create_shortcut_mac(desktop)
-    elif OS == "Windows":
-        _create_shortcut_windows(desktop)
+    # elif OS == "Windows":
+    #     _create_shortcut_windows(desktop)
 
 def _create_shortcut_linux(desktop: Path):
     run_script = ROOT / "run.sh"
@@ -355,23 +406,23 @@ def _create_shortcut_mac(desktop: Path):
     """))
     launcher.chmod(0o755)
     ok(f"App bundle created: {desktop / 'NewsApp.app'}")
-
-def _create_shortcut_windows(desktop: Path):
-    """Use PowerShell to create a .lnk shortcut."""
-    run_bat = ROOT / "run.bat"
-    ps_script = textwrap.dedent(f"""\
-        $WshShell = New-Object -comObject WScript.Shell
-        $Shortcut = $WshShell.CreateShortcut("{desktop}\\NewsApp.lnk")
-        $Shortcut.TargetPath = "{run_bat}"
-        $Shortcut.WorkingDirectory = "{ROOT}"
-        $Shortcut.Description = "Start NewsApp"
-        $Shortcut.Save()
-    """)
-    tmp = ROOT / "installer" / "_make_shortcut.ps1"
-    tmp.write_text(ps_script)
-    run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(tmp)])
-    tmp.unlink(missing_ok=True)
-    ok(f"Desktop shortcut created: {desktop / 'NewsApp.lnk'}")
+#
+# def _create_shortcut_windows(desktop: Path):
+#     """Use PowerShell to create a .lnk shortcut."""
+#     run_bat = ROOT / "run.bat"
+#     ps_script = textwrap.dedent(f"""\
+#         $WshShell = New-Object -comObject WScript.Shell
+#         $Shortcut = $WshShell.CreateShortcut("{desktop}\\NewsApp.lnk")
+#         $Shortcut.TargetPath = "{run_bat}"
+#         $Shortcut.WorkingDirectory = "{ROOT}"
+#         $Shortcut.Description = "Start NewsApp"
+#         $Shortcut.Save()
+#     """)
+#     tmp = ROOT / "installer" / "_make_shortcut.ps1"
+#     tmp.write_text(ps_script)
+#     run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(tmp)])
+#     tmp.unlink(missing_ok=True)
+#     ok(f"Desktop shortcut created: {desktop / 'NewsApp.lnk'}")
 
 # ── Phase 6: Launch ───────────────────────────────────────────────────────────
 
@@ -404,6 +455,9 @@ def _write_run_scripts():
         # NewsApp launcher — generated by installer
         set -e
         ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+        mkdir -p "$ROOT/n8n/data"
+        chmod -R a+rwX "$ROOT/n8n/data" 2>/dev/null || true
 
         echo "▶  Starting n8n..."
         docker compose -f "$ROOT/docker-compose.yml" up -d
