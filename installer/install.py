@@ -35,8 +35,8 @@ VENV_DIR      = ROOT / ".venv"
 
 # ── Config ───────────────────────────────────────────────────────────────────
 N8N_HOST      = "http://localhost:5678"
-N8N_USER      = "admin@newsapp.local"
-N8N_PASSWORD  = "newsapp2024"
+N8N_USER      = "admin@growknow.local"
+N8N_PASSWORD  = "GrowKnowApp2026"
 BACKEND_PORT  = 8000
 FRONTEND_PORT = 5173
 OS            = platform.system()   # "Linux", "Darwin", "Windows"
@@ -516,8 +516,18 @@ def _write_run_scripts():
     """))
 
 def _open_browser(url: str):
-    import webbrowser
-    webbrowser.open(url)
+    # Use xdg-open on Linux to suppress KDE framework warnings
+    if OS == "Linux" and shutil.which("xdg-open"):
+        subprocess.Popen(
+            ["xdg-open", url],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+    else:
+        # Fallback to Python's webbrowser on macOS/Windows or if xdg-open not found
+        import webbrowser
+        webbrowser.open(url)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
