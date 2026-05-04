@@ -62,7 +62,7 @@
     },
     {
       "parameters": {
-        "model": "llama3.2",
+        "model": "llama3.2:latest",
         "baseUrl": "http://host.docker.internal:11434",
         "options": {}
       },

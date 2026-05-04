@@ -19,8 +19,8 @@ import subprocess
 import time
 import urllib.request
 import urllib.error
+import http.cookiejar
 import json
-import shutil
 import textwrap
 from pathlib import Path
 
@@ -42,6 +42,9 @@ FRONTEND_PORT = 5173
 OLLAMA_HOST   = "http://localhost:11434"
 OLLAMA_MODELS = ["llama3.2", "nomic-embed-text"]
 OS            = platform.system()   # "Linux", "Darwin", "Windows"
+
+_N8N_COOKIE_JAR = http.cookiejar.CookieJar()
+_N8N_SESSION_READY = False
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +82,27 @@ def run(cmd, cwd=None, check=True, shell=False, capture=False):
     return result
 
 def cmd_exists(name: str) -> bool:
-    return shutil.which(str(name)) is not None
+    name = os.fspath(name)
+    paths = os.environ.get("PATH", "").split(os.pathsep)
+    if OS == "Windows":
+        exts = [ext.lower() for ext in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep) if ext]
+        for directory in paths:
+            if not directory:
+                continue
+            base = Path(directory)
+            for ext in [""] + exts:
+                candidate = base / f"{name}{ext}"
+                if candidate.is_file():
+                    return True
+        return False
+
+    for directory in paths:
+        if not directory:
+            continue
+        candidate = Path(directory) / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return True
+    return False
 
 def python_bin() -> Path:
     """Return path to the venv python executable."""
@@ -317,6 +340,64 @@ def _n8n_http_healthcheck() -> bool:
     except Exception:
         return False
 
+
+def _n8n_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_N8N_COOKIE_JAR))
+
+
+def _n8n_xsrf_token() -> str:
+    for cookie in _N8N_COOKIE_JAR:
+        name = (cookie.name or "").lower()
+        if "xsrf" in name or "csrf" in name:
+            return cookie.value or ""
+    return ""
+
+
+def _n8n_login(force: bool = False):
+    global _N8N_SESSION_READY
+    if _N8N_SESSION_READY and not force:
+        return
+
+    step("Logging in to n8n...")
+    url = f"{N8N_HOST}/rest/login"
+    payload = json.dumps({
+        "emailOrLdapLoginId": N8N_USER,
+        "password": N8N_PASSWORD,
+    }).encode()
+    opener = _n8n_opener()
+    # Prefetch the root URL to allow the server to set any initial cookies (CSRF token)
+    try:
+        opener.open(urllib.request.Request(N8N_HOST, method="GET"), timeout=5)
+    except Exception:
+        # ignore network errors here; the subsequent login will show a clearer error
+        pass
+
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": N8N_HOST,
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        method="POST",
+    )
+    try:
+        resp = opener.open(req, timeout=15)
+        body = resp.read().decode(errors="ignore")
+        _N8N_SESSION_READY = True
+        ok("n8n session established.")
+        # show cookies for debugging (names only)
+        cookie_names = ", ".join(c.name for c in _N8N_COOKIE_JAR)
+        ok(f"n8n cookies set: {cookie_names}")
+        if body:
+            return json.loads(body)
+        return {}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="ignore")
+        fail(f"Could not log in to n8n ({e.code}): {body[:300]}")
+
 def _n8n_container_state() -> str:
     result = run(["docker", "inspect", "newsapp-n8n", "--format", "{{.State.Status}}"], capture=True, check=False)
     if result.returncode != 0:
@@ -354,20 +435,54 @@ def setup_n8n_owner():
 
 def _n8n_api(method: str, path: str, payload=None) -> dict:
     """Make an authenticated request to the n8n REST API."""
-    import base64
-    creds = base64.b64encode(f"{N8N_USER}:{N8N_PASSWORD}".encode()).decode()
     url = f"{N8N_HOST}/rest{path}"
     data = json.dumps(payload).encode() if payload else None
+    _n8n_login()
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": N8N_HOST,
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    xsrf = _n8n_xsrf_token()
+    if xsrf and method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+        headers["X-XSRF-TOKEN"] = xsrf
+        # Some n8n versions/hosts expect this header name
+        headers["X-N8N-XSRF-TOKEN"] = xsrf
+    # If n8n provided a JWT cookie (n8n-auth) and it is marked Secure (so the
+    # cookie may not be sent over plain HTTP), also add an Authorization header
+    # with the token so requests succeed on localhost without HTTPS.
+    for cookie in _N8N_COOKIE_JAR:
+        if (cookie.name or "").lower() == "n8n-auth" and cookie.value:
+            headers.setdefault("Authorization", f"Bearer {cookie.value}")
+            break
+    # Ensure cookies are sent even if marked Secure (some cookie jars won't send them
+    # over plain HTTP). Build a Cookie header from the jar so the server receives the
+    # session cookie on localhost requests.
+    cookie_header = "; ".join(f"{c.name}={c.value}" for c in _N8N_COOKIE_JAR if c.name and c.value)
+    if cookie_header:
+        headers.setdefault("Cookie", cookie_header)
     req = urllib.request.Request(url, data=data, method=method,
-                                  headers={
-                                      "Content-Type": "application/json",
-                                      "Authorization": f"Basic {creds}",
-                                  })
+                                  headers=headers)
     try:
-        resp = urllib.request.urlopen(req, timeout=15)
-        return json.loads(resp.read())
+        resp = _n8n_opener().open(req, timeout=15)
+        raw = resp.read().decode(errors="ignore")
+        return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="ignore")
+        if e.code == 401:
+            global _N8N_SESSION_READY
+            _N8N_SESSION_READY = False
+            warn("n8n session expired or was not accepted; retrying once after re-login.")
+            _n8n_login(force=True)
+            try:
+                resp = _n8n_opener().open(req, timeout=15)
+                raw = resp.read().decode(errors="ignore")
+                return json.loads(raw) if raw else {}
+            except urllib.error.HTTPError as retry_error:
+                retry_body = retry_error.read().decode(errors="ignore")
+                warn(f"n8n API {method} {path} → {retry_error.code}: {retry_body[:300]}")
+                return {}
         warn(f"n8n API {method} {path} → {e.code}: {body[:300]}")
         return {}
 
@@ -380,7 +495,18 @@ def import_workflow():
     with open(WORKFLOW_FILE) as f:
         workflow = json.load(f)
 
-    result = _n8n_api("POST", "/workflows", workflow)
+    # n8n's /rest/workflows import expects a workflow object that includes a top-level
+    # "name" property. The file here may be an exported object without a name, so
+    # build a minimal payload containing the required fields.
+    payload = workflow.copy() if isinstance(workflow, dict) else {"nodes": [], "connections": {}}
+    if not payload.get("name"):
+        payload["name"] = "Imported · NewsApp"
+    # ensure nodes / connections are present
+    payload.setdefault("nodes", workflow.get("nodes", []))
+    payload.setdefault("connections", workflow.get("connections", {}))
+    payload.setdefault("settings", workflow.get("settings", {}))
+
+    result = _n8n_api("POST", "/workflows", payload)
     wf_id = result.get("data", {}).get("id") or result.get("id")
     if wf_id:
         ok(f"Workflow imported (id={wf_id}).")
@@ -397,10 +523,38 @@ def trigger_first_run(wf_id):
     if not wf_id:
         return
     step("Triggering first workflow run...")
-    result = _n8n_api("POST", f"/workflows/{wf_id}/run", {})
-    if result:
-        ok("First workflow run triggered. News will populate shortly.")
-    else:
+    # Try to trigger the workflow. Some n8n versions expect a payload with
+    # startNodes (names of trigger nodes). Build a best-effort payload from
+    # the local workflow file and retry if needed.
+    payloads = [
+        {},
+    ]
+    # gather trigger node names from the workflow file (if available)
+    try:
+        with open(WORKFLOW_FILE) as f:
+            wf = json.load(f)
+            start_nodes = []
+            for node in wf.get("nodes", []):
+                t = node.get("type", "")
+                # common trigger node identifiers include 'scheduleTrigger' and 'webhook'
+                if "trigger" in t.lower() or "schedule" in t.lower() or "webhook" in t.lower():
+                    if node.get("name"):
+                        start_nodes.append(node.get("name"))
+            if start_nodes:
+                payloads.append({"startNodes": start_nodes})
+                payloads.append({"startNodes": start_nodes, "executionMode": "trigger"})
+    except Exception:
+        start_nodes = []
+
+    success = False
+    for p in payloads:
+        result = _n8n_api("POST", f"/workflows/{wf_id}/run", p)
+        if result:
+            ok("First workflow run triggered. News will populate shortly.")
+            success = True
+            break
+
+    if not success:
         warn("Could not trigger first run — you can do it manually in n8n.")
 
 # ── Phase 3: Django Backend ───────────────────────────────────────────────────
