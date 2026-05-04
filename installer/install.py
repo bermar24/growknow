@@ -39,6 +39,8 @@ N8N_USER      = "admin@growknow.local"
 N8N_PASSWORD  = "GrowKnowApp2026"
 BACKEND_PORT  = 8000
 FRONTEND_PORT = 5173
+OLLAMA_HOST   = "http://localhost:11434"
+OLLAMA_MODELS = ["llama3.2", "nomic-embed-text"]
 OS            = platform.system()   # "Linux", "Darwin", "Windows"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,13 +72,14 @@ def run(cmd, cwd=None, check=True, shell=False, capture=False):
     if capture:
         kwargs["stdout"] = subprocess.PIPE
         kwargs["stderr"] = subprocess.PIPE
+        kwargs["text"] = True
     result = subprocess.run(cmd, **kwargs)
     if check and result.returncode != 0:
         fail(f"Command failed (exit {result.returncode}): {display}")
     return result
 
 def cmd_exists(name: str) -> bool:
-    return shutil.which(name) is not None
+    return shutil.which(str(name)) is not None
 
 def python_bin() -> Path:
     """Return path to the venv python executable."""
@@ -122,7 +125,7 @@ def install_node():
     step("Checking Node.js and npm...")
     if cmd_exists("node") and cmd_exists("npm"):
         r = run(["node", "--version"], capture=True, check=False)
-        ok(f"Node.js already installed: {r.stdout.decode().strip()}")
+        ok(f"Node.js already installed: {r.stdout.strip()}")
         return
 
     warn("Node.js not found. Attempting installation...")
@@ -190,6 +193,73 @@ def _ensure_docker_running():
         warn("Please make sure Docker Desktop is running, then press Enter to continue.")
         input()
 
+# ── Phase 1.5: Ollama ───────────────────────────────────────────────────────
+
+def install_ollama():
+    step("Checking Ollama...")
+    if cmd_exists("ollama"):
+        r = run(["ollama", "--version"], capture=True, check=False)
+        if r.returncode == 0:
+            ok(f"Ollama already installed: {r.stdout.strip()}")
+        else:
+            ok("Ollama command found.")
+    else:
+        warn("Ollama not found. Installing from the official installer...")
+        if OS in {"Linux", "Darwin"}:
+            run("curl -fsSL https://ollama.com/install.sh | sh", shell=True)
+            ok("Ollama installed.")
+        elif OS == "Windows":
+            fail("Ollama not found. Install it from https://ollama.com/download, then re-run the installer.")
+        else:
+            fail(f"Unsupported operating system for automatic Ollama installation: {OS}")
+
+    _ensure_ollama_running()
+    _pull_ollama_models()
+
+
+def _ollama_http_healthcheck() -> bool:
+    try:
+        resp = urllib.request.urlopen(f"{OLLAMA_HOST}/api/version", timeout=3)
+        return resp.status == 200
+    except Exception:
+        return False
+
+
+def _ensure_ollama_running():
+    step("Ensuring Ollama is running...")
+    if _ollama_http_healthcheck():
+        ok("Ollama server is running.")
+        return
+
+    if not cmd_exists("ollama"):
+        fail("Ollama CLI is not available. Install Ollama and re-run the installer.")
+
+    warn("Ollama server is not responding. Starting `ollama serve` in the background...")
+    proc = subprocess.Popen(
+        ["ollama", "serve"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+    for attempt in range(30):
+        if _ollama_http_healthcheck():
+            ok("Ollama server is running.")
+            return
+        if proc.poll() is not None:
+            break
+        time.sleep(2)
+
+    fail("Ollama did not become ready. Start it manually with `ollama serve` and retry.")
+
+
+def _pull_ollama_models():
+    step("Pulling Ollama models used by the workflow...")
+    for model in OLLAMA_MODELS:
+        run(["ollama", "pull", model])
+        ok(f"Model ready: {model}")
+
 # ── Phase 2: n8n via Docker Compose ──────────────────────────────────────────
 
 def start_n8n():
@@ -251,13 +321,13 @@ def _n8n_container_state() -> str:
     result = run(["docker", "inspect", "newsapp-n8n", "--format", "{{.State.Status}}"], capture=True, check=False)
     if result.returncode != 0:
         return ""
-    return result.stdout.decode().strip()
+    return result.stdout.strip()
 
 def _n8n_container_health() -> str:
     result = run(["docker", "inspect", "newsapp-n8n", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{end}}"], capture=True, check=False)
     if result.returncode != 0:
         return ""
-    return result.stdout.decode().strip()
+    return result.stdout.strip()
 
 def setup_n8n_owner():
     """POST to n8n's owner setup endpoint to create the default admin user."""
@@ -517,7 +587,7 @@ def _write_run_scripts():
 
 def _open_browser(url: str):
     # Use xdg-open on Linux to suppress KDE framework warnings
-    if OS == "Linux" and shutil.which("xdg-open"):
+    if OS == "Linux" and cmd_exists("xdg-open"):
         subprocess.Popen(
             ["xdg-open", url],
             stdout=subprocess.DEVNULL,
@@ -540,6 +610,10 @@ def main():
     check_python()
     install_node()
     install_docker()
+
+    # Phase 1.5 — Ollama
+    banner("Phase 1.5 · Ollama (Local AI)")
+    install_ollama()
 
     # Phase 2 — n8n
     banner("Phase 2 · n8n (Docker)")

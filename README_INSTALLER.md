@@ -8,7 +8,7 @@ bash install.sh
 ```
 
 ### Parrot OS
-befor anything, make sure the podman socket is running:
+Before anything, make sure the podman socket is running:
 ```bash
 systemctl --user start podman.socket
 ---
@@ -20,6 +20,12 @@ Phase 1 · System Dependencies
   ✔ Checks Python 3.9+  (installs if missing on Linux/macOS)
   ✔ Checks Node.js/npm  (installs if missing on Linux/macOS)
   ✔ Checks Docker       (installs if missing on Linux)
+
+Phase 1.5 · Ollama (Local AI)
+  ✔ Checks whether Ollama is installed
+  ✔ Installs Ollama from the official installer if missing (Linux/macOS)
+  ✔ Starts the Ollama server if it is not already running
+  ✔ Pulls the local models used by the workflow (`llama3.2`, `nomic-embed-text`)
 
 Phase 2 · n8n (Docker)
   ✔ Pulls and starts n8n container via Docker Compose
@@ -51,6 +57,12 @@ Phase 5 · Launch
 | Frontend | http://localhost:5173      |
 | Backend  | http://localhost:8000      |
 | n8n      | http://localhost:5678      |
+| Ollama   | http://localhost:11434     |
+
+**Docker networking note**
+- The workflow uses `http://host.docker.internal:11434` for Ollama.
+- The workflow uses `http://host.docker.internal:8000` for the Django backend.
+- The Docker Compose file adds `host.docker.internal:host-gateway` so this works on Linux too.
 
 **n8n credentials**
 - Email:    `admin@newsapp.local`
@@ -105,8 +117,17 @@ If automatic installation fails, install these manually:
 | Python 3.9+ | https://python.org |
 | Node.js LTS | https://nodejs.org |
 | Docker Desktop | https://docker.com/products/docker-desktop |
+| Ollama | https://ollama.com/download |
 
 Then re-run `install.sh` / `install.bat`.
+
+After installation, you can also verify Ollama manually:
+```bash
+ollama serve
+# in another terminal
+ollama run llama3.2
+```
+Type `/bye` to exit the model chat session.
 
 ---
 
@@ -121,6 +142,14 @@ newgrp docker
 **n8n doesn't start**
 ```bash
 docker compose logs n8n
+```
+
+**n8n cannot reach Ollama or Django**
+- Confirm `host.docker.internal` resolves from inside the container.
+- On Linux, make sure the Compose file includes the `host-gateway` mapping.
+- Confirm Ollama is up:
+```bash
+curl http://localhost:11434/api/version
 ```
 
 **Port already in use**
