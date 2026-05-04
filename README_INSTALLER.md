@@ -64,9 +64,9 @@ Phase 5 · Launch
 - The workflow uses `http://host.docker.internal:8000` for the Django backend.
 - The Docker Compose file adds `host.docker.internal:host-gateway` so this works on Linux too.
 
-**n8n credentials**
-- Email:    `admin@newsapp.local`
-- Password: `newsapp2024`
+** defoult n8n credentials**
+- Email:    `admin@growknow.local`
+- Password: `GrowKnowApp2026`
 
 ---
 

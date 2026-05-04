@@ -688,7 +688,7 @@ def _write_run_scripts():
 
         echo "▶  Starting Django backend (port {BACKEND_PORT})..."
         source "$ROOT/.venv/bin/activate"
-        python "$ROOT/manage.py" runserver {BACKEND_PORT} &
+        python "$ROOT/manage.py" runserver 0.0.0.0:{BACKEND_PORT} &
         BACKEND_PID=$!
 
         echo "▶  Starting Vite frontend (port {FRONTEND_PORT})..."
@@ -721,7 +721,7 @@ def _write_run_scripts():
         docker compose -f "%ROOT%docker-compose.yml" up -d
 
         echo Starting Django backend (port {BACKEND_PORT})...
-        start "NewsApp Backend" cmd /k "cd /d %ROOT% && .venv\\Scripts\\activate && python manage.py runserver {BACKEND_PORT}"
+        start "NewsApp Backend" cmd /k "cd /d %ROOT% && .venv\\Scripts\\activate && python manage.py runserver 0.0.0.0:{BACKEND_PORT}"
 
         echo Starting Vite frontend (port {FRONTEND_PORT})...
         REM To serve a production build instead, run: npm run build
