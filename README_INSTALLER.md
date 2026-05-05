@@ -166,6 +166,13 @@ docker compose logs n8n
 curl http://localhost:11434/api/version
 ```
 
+### Ollama model credetial fails
+Set the `BaseURL` in your Ollama client configuration to point to the correct address, especially if you are running from WSL or a non-Linux environment:
+
+```bash
+BaseURL = http://host.docker.internal:11434
+```
+
 ### Port already in use
 
 Check whether another process is using ports `5678`, `8000`, or `5173`:

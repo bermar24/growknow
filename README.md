@@ -124,27 +124,39 @@ For a guided setup flow, see `README_INSTALLER.md`.
 
 ### Project links
 
-| Reference | Link |
-|---|---|
-| GrowKnow Repository | https://github.com/bermar24/GrowKnow |
-| GrowKnow Blog | https://knowgrow7.wordpress.com/ |
+| Reference                           | Link |
+|-------------------------------------|---|
+| GrowKnow Repository                 | https://github.com/bermar24/GrowKnow |
+| GrowKnow Blog                       | https://knowgrow7.wordpress.com/ |
+| GrowKnow Documentation Repository   | https://github.com/bermar24/GrowKnow_Documentation |
+| GrowKnow est Plan                   | |
 | Software Requirements Specification | https://github.com/bermar24/GrowKnow_Documentation/blob/main/Software_Requirements_Specification.md |
-| Software Architecture Document | https://github.com/bermar24/GrowKnow_Documentation/blob/main/Software_Architecture_Document.md |
+| Software Architecture Document      | https://github.com/bermar24/GrowKnow_Documentation/blob/main/Software_Architecture_Document.md |
 
 ### GrowKnow blog posts
 
-| Post | Link |
-|---|---|
-| Homepage Blog | https://knowgrow7.wordpress.com/ |
-| #1 Blog - Our Vision & Mission | https://knowgrow7.wordpress.com/2025/09/15/our-vision-mission/ |
-| #2 Blog - Team and Technology | https://knowgrow7.wordpress.com/2025/09/22/team-and-technology/ |
+| Post                                                                               | Link |
+|------------------------------------------------------------------------------------|---|
+| Homepage Blog                                                                      | https://knowgrow7.wordpress.com/ |
+| #1 Blog - Our Vision & Mission                                                     | https://knowgrow7.wordpress.com/2025/09/15/our-vision-mission/ |
+| #2 Blog - Team and Technology                                                      | https://knowgrow7.wordpress.com/2025/09/22/team-and-technology/ |
 | #3 Blog - Introducing Our Software Requirements Specification and Use Case Diagram | https://knowgrow7.wordpress.com/2025/10/01/introducing-our-software-requirements-specification-and-use-case-diagram/ |
-| #4 Blog - Detailing Two Core Use Cases | https://knowgrow7.wordpress.com/2025/10/08/detailing-two-core-use-cases/ |
-| #5 Blog - Bringing Our Use Cases to Life with BDD | https://knowgrow7.wordpress.com/2025/10/15/bringing-our-use-cases-to-life-with-bdd/ |
-| #6 Blog - Sprint & Task Management | https://knowgrow7.wordpress.com/2025/10/16/sprint-task-management/ |
-| #7 Blog - Architecture, Design Patterns, and the Decoupled Stack | https://knowgrow7.wordpress.com/2025/10/29/architecture-design-patterns-and-the-decoupled-stack/ |
-| #8 Blog - Visualizing Our System: Database & UML Diagrams | https://knowgrow7.wordpress.com/2025/11/05/visualizing-our-system-database-uml-diagrams/ |
-| #9 Blog - Retrospective | https://knowgrow7.wordpress.com/2025/11/12/retrospective/ |
+| #4 Blog - Detailing Two Core Use Cases                                             | https://knowgrow7.wordpress.com/2025/10/08/detailing-two-core-use-cases/ |
+| #5 Blog - Bringing Our Use Cases to Life with BDD                                  | https://knowgrow7.wordpress.com/2025/10/15/bringing-our-use-cases-to-life-with-bdd/ |
+| #6 Blog - Sprint & Task Management                                                 | https://knowgrow7.wordpress.com/2025/10/16/sprint-task-management/ |
+| #7 Blog - Architecture, Design Patterns, and the Decoupled Stack                   | https://knowgrow7.wordpress.com/2025/10/29/architecture-design-patterns-and-the-decoupled-stack/ |
+| #8 Blog - Visualizing Our System: Database & UML Diagrams                          | https://knowgrow7.wordpress.com/2025/11/05/visualizing-our-system-database-uml-diagrams/ |
+| #9 Blog - Retrospective                                                            | https://knowgrow7.wordpress.com/2025/11/12/retrospective/ |
+| #10 Blog - Midterm Milestone                                                       | https://knowgrow7.wordpress.com/2025/11/18/midterm-milestone-first-client-presentation/|
+| #11 Blog - Welcome Back!                                                           | https://knowgrow7.wordpress.com/2026/03/17/welcome-back/ |
+| #12 Blog - Risk Register Implementation                                            | https://knowgrow7.wordpress.com/2026/03/19/risk-register-implementation/ |
+| #13 Blog - Estimating Effort with Function Points                                  |https://knowgrow7.wordpress.com/2026/03/26/estimating-effort-with-function-points/ |
+| #14 Blog - Testing, Testing… Is This Thing On?                                     | https://knowgrow7.wordpress.com/2026/04/02/testing-testing-is-this-thing-on/|
+| #15 Blog - Refactoring Lab                                                         | https://knowgrow7.wordpress.com/2026/04/09/refactoring-lab/ |
+| #16 Blog - Sprint Retrospective                                                    | https://knowgrow7.wordpress.com/2026/04/16/sprint-retrospective/ |
+| #17 Blog - SOLID Principles and Design Patterns in Practice                        | https://knowgrow7.wordpress.com/2026/04/27/solid-principles-and-design-patterns-in-practice/ |
+| #18 Blog - Metrics                                                                 | https://knowgrow7.wordpress.com/2026/04/30/metrics/ |
+| #19 Blog - Final Presentation                                                      | https://knowgrow7.wordpress.com/2026/05/05/final-presentation/ |
 
 ## Team
 
@@ -155,12 +167,12 @@ We follow the **Rational Unified Process (RUP)**, so roles evolve across phases:
 - Project Manager / Software Architect: planning, architecture, requirements to design.
 - Backend Developer: APIs, database interactions, and automation pipelines.
 
-### Emin
+### Emin  (Left the project beginning of December 2025)
 
 - Frontend Developer / UX Designer: UI, navigation, accessibility, and responsive design.
 - Tester / Quality Engineer: defines and executes test cases, ensures usability and robustness.
 
-### Roic
+### Roic  (Left the project beginning of December 2025)
 
 - Database Engineer / Data Pipeline Specialist: schemas, ingestion, embeddings, and fact-checking.
 - DevOps / Release Manager: CI/CD, monitoring, deployments, and release coordination.

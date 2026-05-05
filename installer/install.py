@@ -41,6 +41,8 @@ N8N_PASSWORD  = "GrowKnowApp2026"
 BACKEND_PORT  = 8000
 FRONTEND_PORT = 5173
 OLLAMA_HOST   = "http://localhost:11434"
+N8N_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+N8N_OLLAMA_CREDENTIAL_NAME = "Ollama Local"
 OLLAMA_MODELS = ["llama3.2", "nomic-embed-text"]
 OS            = platform.system()   # "Linux", "Darwin", "Windows"
 
@@ -487,6 +489,63 @@ def _n8n_api(method: str, path: str, payload=None) -> dict:
         warn(f"n8n API {method} {path} → {e.code}: {body[:300]}")
         return {}
 
+def _as_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        for key in ("data", "credentials", "results", "items"):
+            nested = value.get(key)
+            if isinstance(nested, list):
+                return nested
+            if isinstance(nested, dict):
+                return list(nested.values())
+        return [value]
+    return []
+
+def _ensure_ollama_credential() -> dict:
+    """Create or reuse the n8n Ollama credential used by the LangChain chat node."""
+    step("Ensuring n8n Ollama credential exists...")
+
+    existing = _n8n_api("GET", "/credentials")
+    for cred in _as_list(existing):
+        if cred.get("name") == N8N_OLLAMA_CREDENTIAL_NAME:
+            cred_id = cred.get("id") or cred.get("credentialId")
+            if cred_id:
+                ok(f"Ollama credential already exists: {N8N_OLLAMA_CREDENTIAL_NAME}")
+                return {"id": cred_id, "name": cred.get("name", N8N_OLLAMA_CREDENTIAL_NAME)}
+
+    payload = {
+        "name": N8N_OLLAMA_CREDENTIAL_NAME,
+        "type": "ollamaApi",
+        "data": {
+            "baseUrl": N8N_OLLAMA_BASE_URL,
+        },
+    }
+    created = _n8n_api("POST", "/credentials", payload)
+    cred = created.get("data") if isinstance(created, dict) else None
+    if not isinstance(cred, dict):
+        cred = created if isinstance(created, dict) else {}
+
+    cred_id = cred.get("id") or cred.get("credentialId") or created.get("id")
+    if cred_id:
+        ok(f"Created n8n Ollama credential: {N8N_OLLAMA_CREDENTIAL_NAME}")
+        return {"id": cred_id, "name": N8N_OLLAMA_CREDENTIAL_NAME}
+
+    warn("Could not confirm Ollama credential creation; importing workflow anyway.")
+    return {"id": None, "name": N8N_OLLAMA_CREDENTIAL_NAME}
+
+def _attach_ollama_credential(workflow: dict, credential: dict) -> bool:
+    changed = False
+    for node in workflow.get("nodes", []):
+        if node.get("type") == "@n8n/n8n-nodes-langchain.lmChatOllama":
+            node.setdefault("credentials", {})
+            node["credentials"]["ollamaApi"] = {
+                "id": credential.get("id"),
+                "name": credential.get("name", N8N_OLLAMA_CREDENTIAL_NAME),
+            }
+            changed = True
+    return changed
+
 def import_workflow():
     step("Importing n8n workflow...")
     if not WORKFLOW_FILE.exists():
@@ -495,6 +554,9 @@ def import_workflow():
 
     with open(WORKFLOW_FILE) as f:
         workflow = json.load(f)
+
+    ollama_credential = _ensure_ollama_credential()
+    _attach_ollama_credential(workflow, ollama_credential)
 
     # n8n's /rest/workflows import expects a workflow object that includes a top-level
     # "name" property. The file here may be an exported object without a name, so
