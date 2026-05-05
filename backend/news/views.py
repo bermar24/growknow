@@ -1,6 +1,6 @@
 from typing import Callable
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework.views import APIView
@@ -57,13 +57,14 @@ class ResponseFacadeMixin(ServiceMixin):
         return self._response_facade
 
 
-class NewsArticleViewSet(ResponseFacadeMixin, viewsets.ReadOnlyModelViewSet):
+class NewsArticleViewSet(ResponseFacadeMixin, viewsets.ModelViewSet):
     """
     Read-only API for news articles. Change to ModelViewSet for full CRUD.
     """
     queryset = NewsArticle.objects.all().order_by('-created_at')
     serializer_class = NewsArticleSerializer
     service_factory = ReadServiceFactory.create_news_article_service
+    permission_classes = [permissions.AllowAny]
 
     # SOLID (OCP): behavior extensions now happen via service_factory/facade composition.
     # Pattern (Facade + Factory Method): endpoint delegates response and dependency creation.

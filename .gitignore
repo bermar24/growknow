@@ -19,3 +19,8 @@ __pycache__/
 db.sqlite3
 # VSCode settings
 .vscode/
+# n8n container runtime state
+n8n/data/
+# shorcuts
+run.sh
+run.bat

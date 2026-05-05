@@ -47,7 +47,13 @@ if _allowed_raw:
             # Accept hostname or host:port or wildcard (e.g. .example.com)
             ALLOWED_HOSTS.append(part.rstrip('/'))
 else:
-    ALLOWED_HOSTS = []
+    ALLOWED_HOSTS = [
+        'localhost',
+        '127.0.0.1',
+        '[::1]',
+        'host.docker.internal',
+        'host.containers.internal',
+    ]
 
 # Application definition
 

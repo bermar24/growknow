@@ -5,15 +5,20 @@ from .adapters import SourceMetadataAdapter
 
 class NewsArticleSerializer(serializers.ModelSerializer):
     # Map model fields to frontend-friendly keys
-    publishedAt = serializers.DateTimeField(source='published_at', allow_null=True)
+    publishedAt = serializers.DateTimeField(source='published_at', allow_null=True, required=False)
     summary = serializers.CharField(source='content')
     url = serializers.CharField(source='source_link')
-    tags = serializers.ListField(source='industry_tags', child=serializers.CharField(), allow_empty=True)
+    tags = serializers.ListField(
+        source='industry_tags',
+        child=serializers.CharField(),
+        allow_empty=True,
+        required=False,
+        default=list,
+    )
     # The original frontend used a `source` object; we synthesize a minimal one from source_link
     source = serializers.SerializerMethodField()
-    # Frontend expects categories and vendors fields; provide empty defaults for now
-    categories = serializers.SerializerMethodField()
-    vendors = serializers.SerializerMethodField()
+    categories = serializers.ListField(child=serializers.CharField(), allow_empty=True, required=False, default=list)
+    vendors = serializers.ListField(child=serializers.CharField(), allow_empty=True, required=False, default=list)
 
     class Meta:
         model = NewsArticle
@@ -34,19 +39,28 @@ class NewsArticleSerializer(serializers.ModelSerializer):
             'author',
         )
 
+    def to_internal_value(self, data):
+        mutable = data.copy()
+        source_payload = mutable.pop('source', None)
+        validated = super().to_internal_value(mutable)
+
+        if isinstance(source_payload, dict):
+            src_url = source_payload.get('url')
+            src_name = source_payload.get('name')
+            src_favicon = source_payload.get('favicon')
+            if src_url:
+                validated['source_url'] = src_url
+            if src_name:
+                validated['source_name'] = src_name
+            if src_favicon:
+                validated['source_favicon'] = src_favicon
+        return validated
+
     def get_source(self, obj):
         # SOLID (SRP): keep serializer focused on field exposure, not URL parsing details.
         # Pattern (Adapter): delegate source-shape conversion to SourceMetadataAdapter.
         # Benefit: source mapping rules are reusable and easier to change in one place.
         return SourceMetadataAdapter.from_article(obj)
-
-    def get_categories(self, obj):
-        # No categories on the model yet — return empty list for compatibility
-        return []
-
-    def get_vendors(self, obj):
-        # No vendors on the model yet — return empty list for compatibility
-        return []
 
 
 class ToolSerializer(serializers.ModelSerializer):

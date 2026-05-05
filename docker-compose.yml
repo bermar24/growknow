@@ -1,8 +1,7 @@
-# docker-compose.yml — n8n for NewsApp
+# docker-compose.yml — n8n for GrowKnow
 # Starts a local n8n instance with persistent data stored in ./n8n/data
 # n8n will be available at http://localhost:5678
 
-version: "3.8"
 
 services:
   n8n:
@@ -11,6 +10,8 @@ services:
     restart: unless-stopped
     ports:
       - "5678:5678"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # ── Auth ──────────────────────────────────────────────────
       N8N_BASIC_AUTH_ACTIVE: "false"        # We use the owner account instead

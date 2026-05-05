@@ -1,0 +1,174 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "interval": 1
+            }
+          ]
+        }
+      },
+      "id": "e0a1b2c3-d4e5-4f67-a8b9-c0d1e2f3a4b5",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.artificialintelligence-news.com/feed/",
+        "options": {}
+      },
+      "id": "f1a2b3c4-d5e6-4f78-a9b0-c1d2e3f4a5b6",
+      "name": "Fetch RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "XML to JSON",
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "rss.channel.item",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "Split Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1060, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this news title: \"{{ $json.title }}\". \nIs this specifically about Artificial Intelligence or Machine Learning? \nAnswer with ONLY the word 'True' or 'False'. No punctuation."
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Ollama Filter",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:latest",
+        "baseUrl": "http://host.docker.internal:11434",
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7e",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [1060, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-true",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "Filter AI Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-title",
+              "name": "title",
+              "value": "={{ $('Split Items').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "set-url",
+              "name": "url",
+              "value": "={{ $('Split Items').item.json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "set-summary",
+              "name": "summary",
+              "value": "={{ $('Split Items').item.json.description }}",
+              "type": "string"
+            },
+            {
+              "id": "set-published",
+              "name": "publishedAt",
+              "value": "={{ new Date($('Split Items').item.json.pubDate).toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "set-source",
+              "name": "source",
+              "value": "={ \"name\": \"AI News\", \"url\": \"https://www.artificialintelligence-news.com\" }",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Format for Django",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1720, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/news/articles/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "Push to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1940, 280]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Fetch RSS", "type": "main", "index": 0 }]] },
+    "Fetch RSS": { "main": [[{ "node": "XML to JSON", "type": "main", "index": 0 }]] },
+    "XML to JSON": { "main": [[{ "node": "Split Items", "type": "main", "index": 0 }]] },
+    "Split Items": { "main": [[{ "node": "Ollama Filter", "type": "main", "index": 0 }]] },
+    "Ollama Chat Model": { "ai_languageModel": [[{ "node": "Ollama Filter", "type": "ai_languageModel", "index": 0 }]] },
+    "Ollama Filter": { "main": [[{ "node": "Filter AI Only", "type": "main", "index": 0 }]] },
+    "Filter AI Only": { "main": [[{ "node": "Format for Django", "type": "main", "index": 0 }]] },
+    "Format for Django": { "main": [[{ "node": "Push to Backend", "type": "main", "index": 0 }]] }
+  }
+}
