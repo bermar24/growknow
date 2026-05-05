@@ -6,7 +6,8 @@ Called by install.sh (Linux/macOS) or install.bat (Windows).
 
 Phases:
   1. System dependencies  (Python already running us, so just Node + Docker)
-  2. n8n via Docker Compose
+  2. Ollama and local models
+  3. n8n via Docker Compose
   3. Django backend
   4. Vite frontend
   5. Desktop shortcut + launch
@@ -40,6 +41,8 @@ N8N_PASSWORD  = "GrowKnowApp2026"
 BACKEND_PORT  = 8000
 FRONTEND_PORT = 5173
 OLLAMA_HOST   = "http://localhost:11434"
+N8N_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+N8N_OLLAMA_CREDENTIAL_NAME = "Ollama Local"
 OLLAMA_MODELS = ["llama3.2", "nomic-embed-text"]
 OS            = platform.system()   # "Linux", "Darwin", "Windows"
 
@@ -216,7 +219,7 @@ def _ensure_docker_running():
         warn("Please make sure Docker Desktop is running, then press Enter to continue.")
         input()
 
-# ── Phase 1.5: Ollama ───────────────────────────────────────────────────────
+# ── Phase 2: Ollama ───────────────────────────────────────────────────────
 
 def install_ollama():
     step("Checking Ollama...")
@@ -283,7 +286,7 @@ def _pull_ollama_models():
         run(["ollama", "pull", model])
         ok(f"Model ready: {model}")
 
-# ── Phase 2: n8n via Docker Compose ──────────────────────────────────────────
+# ── Phase 3: n8n via Docker Compose ──────────────────────────────────────────
 
 def start_n8n():
     step("Starting n8n via Docker Compose...")
@@ -486,6 +489,63 @@ def _n8n_api(method: str, path: str, payload=None) -> dict:
         warn(f"n8n API {method} {path} → {e.code}: {body[:300]}")
         return {}
 
+def _as_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        for key in ("data", "credentials", "results", "items"):
+            nested = value.get(key)
+            if isinstance(nested, list):
+                return nested
+            if isinstance(nested, dict):
+                return list(nested.values())
+        return [value]
+    return []
+
+def _ensure_ollama_credential() -> dict:
+    """Create or reuse the n8n Ollama credential used by the LangChain chat node."""
+    step("Ensuring n8n Ollama credential exists...")
+
+    existing = _n8n_api("GET", "/credentials")
+    for cred in _as_list(existing):
+        if cred.get("name") == N8N_OLLAMA_CREDENTIAL_NAME:
+            cred_id = cred.get("id") or cred.get("credentialId")
+            if cred_id:
+                ok(f"Ollama credential already exists: {N8N_OLLAMA_CREDENTIAL_NAME}")
+                return {"id": cred_id, "name": cred.get("name", N8N_OLLAMA_CREDENTIAL_NAME)}
+
+    payload = {
+        "name": N8N_OLLAMA_CREDENTIAL_NAME,
+        "type": "ollamaApi",
+        "data": {
+            "baseUrl": N8N_OLLAMA_BASE_URL,
+        },
+    }
+    created = _n8n_api("POST", "/credentials", payload)
+    cred = created.get("data") if isinstance(created, dict) else None
+    if not isinstance(cred, dict):
+        cred = created if isinstance(created, dict) else {}
+
+    cred_id = cred.get("id") or cred.get("credentialId") or created.get("id")
+    if cred_id:
+        ok(f"Created n8n Ollama credential: {N8N_OLLAMA_CREDENTIAL_NAME}")
+        return {"id": cred_id, "name": N8N_OLLAMA_CREDENTIAL_NAME}
+
+    warn("Could not confirm Ollama credential creation; importing workflow anyway.")
+    return {"id": None, "name": N8N_OLLAMA_CREDENTIAL_NAME}
+
+def _attach_ollama_credential(workflow: dict, credential: dict) -> bool:
+    changed = False
+    for node in workflow.get("nodes", []):
+        if node.get("type") == "@n8n/n8n-nodes-langchain.lmChatOllama":
+            node.setdefault("credentials", {})
+            node["credentials"]["ollamaApi"] = {
+                "id": credential.get("id"),
+                "name": credential.get("name", N8N_OLLAMA_CREDENTIAL_NAME),
+            }
+            changed = True
+    return changed
+
 def import_workflow():
     step("Importing n8n workflow...")
     if not WORKFLOW_FILE.exists():
@@ -494,6 +554,9 @@ def import_workflow():
 
     with open(WORKFLOW_FILE) as f:
         workflow = json.load(f)
+
+    ollama_credential = _ensure_ollama_credential()
+    _attach_ollama_credential(workflow, ollama_credential)
 
     # n8n's /rest/workflows import expects a workflow object that includes a top-level
     # "name" property. The file here may be an exported object without a name, so
@@ -557,7 +620,7 @@ def trigger_first_run(wf_id):
     if not success:
         warn("Could not trigger first run — you can do it manually in n8n.")
 
-# ── Phase 3: Django Backend ───────────────────────────────────────────────────
+# ── Phase 4: Django Backend ───────────────────────────────────────────────────
 
 def setup_backend():
     step("Creating Python virtual environment...")
@@ -579,14 +642,14 @@ def setup_backend():
         cwd=ROOT)
     ok("Migrations applied.")
 
-# ── Phase 4: Frontend ─────────────────────────────────────────────────────────
+# ── Phase 5: Frontend ─────────────────────────────────────────────────────────
 
 def setup_frontend():
     step("Installing frontend dependencies (npm install)...")
     run(["npm", "install"], cwd=FRONTEND_DIR)
     ok("Frontend dependencies installed.")
 
-# ── Phase 5: Desktop Shortcut ─────────────────────────────────────────────────
+# ── Phase 6: Desktop Shortcut ─────────────────────────────────────────────────
 
 def create_desktop_shortcut():
     step("Creating desktop shortcut...")
@@ -630,25 +693,9 @@ def _create_shortcut_mac(desktop: Path):
     """))
     launcher.chmod(0o755)
     ok(f"App bundle created: {desktop / 'NewsApp.app'}")
-#
-# def _create_shortcut_windows(desktop: Path):
-#     """Use PowerShell to create a .lnk shortcut."""
-#     run_bat = ROOT / "run.bat"
-#     ps_script = textwrap.dedent(f"""\
-#         $WshShell = New-Object -comObject WScript.Shell
-#         $Shortcut = $WshShell.CreateShortcut("{desktop}\\NewsApp.lnk")
-#         $Shortcut.TargetPath = "{run_bat}"
-#         $Shortcut.WorkingDirectory = "{ROOT}"
-#         $Shortcut.Description = "Start NewsApp"
-#         $Shortcut.Save()
-#     """)
-#     tmp = ROOT / "installer" / "_make_shortcut.ps1"
-#     tmp.write_text(ps_script)
-#     run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(tmp)])
-#     tmp.unlink(missing_ok=True)
-#     ok(f"Desktop shortcut created: {desktop / 'NewsApp.lnk'}")
 
-# ── Phase 6: Launch ───────────────────────────────────────────────────────────
+
+# ── Phase 7: Launch ───────────────────────────────────────────────────────────
 
 def launch_app():
     """Write and launch run.sh / run.bat, then open the browser."""
@@ -709,35 +756,35 @@ def _write_run_scripts():
         wait
     """))
     run_sh.chmod(0o755)
-
-    # ── run.bat ───────────────────────────────────────────────────────────────
-    run_bat = ROOT / "run.bat"
-    run_bat.write_text(textwrap.dedent(f"""\
-        @echo off
-        REM NewsApp launcher — generated by installer
-        SET ROOT=%~dp0
-
-        echo Starting n8n...
-        docker compose -f "%ROOT%docker-compose.yml" up -d
-
-        echo Starting Django backend (port {BACKEND_PORT})...
-        start "NewsApp Backend" cmd /k "cd /d %ROOT% && .venv\\Scripts\\activate && python manage.py runserver 0.0.0.0:{BACKEND_PORT}"
-
-        echo Starting Vite frontend (port {FRONTEND_PORT})...
-        REM To serve a production build instead, run: npm run build
-        start "NewsApp Frontend" cmd /k "cd /d %ROOT%frontend && npm run dev"
-
-        echo.
-        echo ==========================================
-        echo   NewsApp is starting!
-        echo   Frontend  ^> http://localhost:{FRONTEND_PORT}
-        echo   Backend   ^> http://localhost:{BACKEND_PORT}
-        echo   n8n       ^> http://localhost:5678
-        echo ==========================================
-
-        timeout /t 5
-        start http://localhost:{FRONTEND_PORT}
-    """))
+    #
+    # # ── run.bat ───────────────────────────────────────────────────────────────
+    # run_bat = ROOT / "run.bat"
+    # run_bat.write_text(textwrap.dedent(f"""\
+    #     @echo off
+    #     REM NewsApp launcher — generated by installer
+    #     SET ROOT=%~dp0
+    #
+    #     echo Starting n8n...
+    #     docker compose -f "%ROOT%docker-compose.yml" up -d
+    #
+    #     echo Starting Django backend (port {BACKEND_PORT})...
+    #     start "NewsApp Backend" cmd /k "cd /d %ROOT% && .venv\\Scripts\\activate && python manage.py runserver 0.0.0.0:{BACKEND_PORT}"
+    #
+    #     echo Starting Vite frontend (port {FRONTEND_PORT})...
+    #     REM To serve a production build instead, run: npm run build
+    #     start "NewsApp Frontend" cmd /k "cd /d %ROOT%frontend && npm run dev"
+    #
+    #     echo.
+    #     echo ==========================================
+    #     echo   NewsApp is starting!
+    #     echo   Frontend  ^> http://localhost:{FRONTEND_PORT}
+    #     echo   Backend   ^> http://localhost:{BACKEND_PORT}
+    #     echo   n8n       ^> http://localhost:5678
+    #     echo ==========================================
+    #
+    #     timeout /t 5
+    #     start http://localhost:{FRONTEND_PORT}
+    # """))
 
 def _open_browser(url: str):
     # Use xdg-open on Linux to suppress KDE framework warnings
@@ -765,11 +812,11 @@ def main():
     install_node()
     install_docker()
 
-    # Phase 1.5 — Ollama
+    # Phase 2 — Ollama
     banner("Phase 1.5 · Ollama (Local AI)")
     install_ollama()
 
-    # Phase 2 — n8n
+    # Phase 3 — n8n
     banner("Phase 2 · n8n (Docker)")
     start_n8n()
     wait_for_n8n()
@@ -777,15 +824,15 @@ def main():
     wf_id = import_workflow()
     trigger_first_run(wf_id)
 
-    # Phase 3 — Backend
+    # Phase 4 — Backend
     banner("Phase 3 · Django Backend")
     setup_backend()
 
-    # Phase 4 — Frontend
+    # Phase 5 — Frontend
     banner("Phase 4 · Vite Frontend")
     setup_frontend()
 
-    # Phase 5 — Shortcut + Launch
+    # Phase 6 — Shortcut + Launch
     banner("Phase 5 · Desktop Shortcut & Launch")
     create_desktop_shortcut()
     launch_app()

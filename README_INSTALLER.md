@@ -1,169 +1,190 @@
-# NewsApp — Installer README
+# GrowKnow Installer Guide
 
-## Quick Start
+This document explains how to install and run GrowKnow on **Linux**. If you are on Windows, use **WSL2** and follow the Linux steps inside the WSL terminal.
 
-### Linux / macOS
+## Index
+
+- [Prerequisites](#prerequisites)
+- [Quick start](#quick-start)
+- [What the installer does](#what-the-installer-does)
+- [Service URLs](#service-urls)
+- [After installation](#after-installation)
+- [Project structure](#project-structure)
+- [Manual dependency installation](#manual-dependency-installation)
+- [Troubleshooting](#troubleshooting)
+
+## Prerequisites
+
+Install or verify the following before running the installer:
+
+- Python 3.9 or newer
+- Node.js and npm
+- Docker with Docker Compose support
+- Ollama
+
+Recommended setup on Linux:
+
+- Use a recent Ubuntu-based distribution or a compatible system.
+- Make sure your user can run Docker without permission errors.
+- If you plan to use the browser UI and n8n together, keep ports `5173`, `8000`, `5678`, and `11434` available.
+
+### Windows note
+
+Use **WSL2** with a Linux distribution such as Ubuntu, then run the same Linux commands from inside WSL. This keeps the runtime behavior aligned with the documented installer flow.
+
+## Quick start
+
+From the project root:
+
 ```bash
 bash install.sh
 ```
 
-### Parrot OS
-Before anything, make sure the podman socket is running:
-```bash
-systemctl --user start podman.socket
----
+The installer delegates to the Python installer under `installer/install.py`.
 
-## What the Installer Does
+## What the installer does
 
-```
-Phase 1 · System Dependencies
-  ✔ Checks Python 3.9+  (installs if missing on Linux/macOS)
-  ✔ Checks Node.js/npm  (installs if missing on Linux/macOS)
-  ✔ Checks Docker       (installs if missing on Linux)
+The current installer flow is organized in phases:
 
-Phase 1.5 · Ollama (Local AI)
-  ✔ Checks whether Ollama is installed
-  ✔ Installs Ollama from the official installer if missing (Linux/macOS)
-  ✔ Starts the Ollama server if it is not already running
-  ✔ Pulls the local models used by the workflow (`llama3.2`, `nomic-embed-text`)
+### Phase 1: system dependencies
 
-Phase 2 · n8n (Docker)
-  ✔ Pulls and starts n8n container via Docker Compose
-  ✔ Waits for n8n to be healthy
-  ✔ Creates default admin account
-  ✔ Imports the news workflow from n8n/workflow.json
-  ✔ Triggers the first news fetch
+- Checks for Python 3.9+.
+- Ensures Python packages needed for virtual environments and pip are available.
+- Checks Node.js/npm.
+- Checks Docker support for the n8n container.
 
-Phase 3 · Django Backend
-  ✔ Creates a Python virtual environment (.venv/)
-  ✔ Installs backend/requirements.txt
-  ✔ Runs database migrations
+### Phase 2: Ollama and local models
 
-Phase 4 · Vite Frontend
-  ✔ Runs npm install in frontend/
+- Checks whether Ollama is installed.
+- Starts the Ollama service if needed.
+- Pulls the local models used by the automation workflow.
 
-Phase 5 · Launch
-  ✔ Creates a "NewsApp" shortcut on your Desktop
-  ✔ Starts backend, frontend, and n8n
-  ✔ Opens http://localhost:5173 in your browser
-```
+### Phase 3: n8n automation
 
----
+- Starts n8n with Docker Compose.
+- Waits for n8n to become healthy.
+- Imports the workflow stored in `n8n/workflow.json`.
+- Triggers the first ingestion run.
+
+### Phase 4: Django backend
+
+- Creates a virtual environment if needed.
+- Installs the backend Python dependencies.
+- Runs database migrations.
+
+### Phase 5: frontend setup
+
+- Installs the frontend dependencies in `frontend/`.
+
+### Phase 6: launch
+
+- Starts the services needed for local development.
+- Opens the application in the browser when supported by the environment.
 
 ## Service URLs
 
-| Service  | URL                       |
-|----------|---------------------------|
-| Frontend | http://localhost:5173      |
-| Backend  | http://localhost:8000      |
-| n8n      | http://localhost:5678      |
-| Ollama   | http://localhost:11434     |
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:8000 |
+| n8n | http://localhost:5678 |
+| Ollama | http://localhost:11434 |
 
-**Docker networking note**
-- The workflow uses `http://host.docker.internal:11434` for Ollama.
-- The workflow uses `http://host.docker.internal:8000` for the Django backend.
-- The Docker Compose file adds `host.docker.internal:host-gateway` so this works on Linux too.
+## After installation
 
-** defoult n8n credentials**
-- Email:    `admin@growknow.local`
-- Password: `GrowKnowApp2026`
+To run the project again after it has been installed:
 
----
-
-## After Installation
-
-Use the **NewsApp** shortcut on your Desktop to start the app.
-
-Or manually:
 ```bash
-# Linux/macOS
 bash run.sh
-
-# Windows
-run.bat
 ```
 
----
+If you are using WSL on Windows, run the command inside your WSL terminal.
 
-## Project Structure
+## Project structure
 
-```
-NewsApp/
-├── install.sh              ← Run this on Linux/macOS
-├── install.bat             ← Run this on Windows
-├── run.sh                  ← Generated by installer (Linux/macOS launcher)
-├── run.bat                 ← Generated by installer (Windows launcher)
-├── docker-compose.yml      ← n8n container definition
+```text
+growknow/
+├── install.sh              # Linux entry point for installation
+├── run.sh                  # Launcher script used after setup
+├── docker-compose.yml      # n8n container definition
 ├── installer/
-│   └── install.py          ← Main installer logic
+│   └── install.py          # Main installer logic
 ├── n8n/
-│   ├── workflow.json       ← n8n automation workflow
-│   └── data/               ← n8n persistent data (git-ignored)
-├── backend/                ← Django project
-│   ├── manage.py
-│   └── requirements.txt
-└── frontend/               ← Vite/React project
-    └── package.json
+│   ├── workflow.json       # n8n automation workflow
+│   └── data/               # n8n persistent data
+├── backend/                # Django project
+└── frontend/               # Vite/React app
 ```
 
----
+## Manual dependency installation
 
-## Manual Dependency Installation
+If automatic setup fails, install these manually and then re-run `bash install.sh`:
 
-If automatic installation fails, install these manually:
-
-| Dependency | Download |
-|------------|----------|
-| Python 3.9+ | https://python.org |
-| Node.js LTS | https://nodejs.org |
-| Docker Desktop | https://docker.com/products/docker-desktop |
+| Dependency | Official source |
+|---|---|
+| Python | https://python.org |
+| Node.js | https://nodejs.org |
+| Docker | https://www.docker.com/ |
 | Ollama | https://ollama.com/download |
 
-Then re-run `install.sh` / `install.bat`.
+You can also verify Ollama manually:
 
-After installation, you can also verify Ollama manually:
 ```bash
 ollama serve
-# in another terminal
+```
+
+In another terminal:
+
+```bash
 ollama run llama3.2
 ```
-Type `/bye` to exit the model chat session.
 
----
+Type `/bye` to exit the model session.
 
 ## Troubleshooting
 
-**Docker permission denied (Linux)**
+### Docker permission denied on Linux
+
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-**n8n doesn't start**
+### n8n does not start
+
 ```bash
 docker compose logs n8n
 ```
 
-**n8n cannot reach Ollama or Django**
-- Confirm `host.docker.internal` resolves from inside the container.
-- On Linux, make sure the Compose file includes the `host-gateway` mapping.
-- Confirm Ollama is up:
+### n8n cannot reach Ollama or Django
+
+- Make sure `host.docker.internal` resolves from inside the container.
+- On Linux, the Compose file should map `host.docker.internal` through the host gateway.
+- Confirm Ollama is reachable:
+
 ```bash
 curl http://localhost:11434/api/version
 ```
 
-**Port already in use**
-Check if another process is using ports 5678, 8000, or 5173:
+### Ollama model credetial fails
+Set the `BaseURL` in your Ollama client configuration to point to the correct address, especially if you are running from WSL or a non-Linux environment:
+
 ```bash
-# Linux/macOS
-lsof -i :5678
-# Windows
-netstat -ano | findstr :5678
+BaseURL = http://host.docker.internal:11434
 ```
 
-**Reset everything**
+### Port already in use
+
+Check whether another process is using ports `5678`, `8000`, or `5173`:
+
 ```bash
-docker compose down -v   # removes n8n data volume too
+lsof -i :5678
+```
+
+### Reset everything
+
+```bash
+docker compose down -v
 rm -rf .venv
-bash install.sh          # re-run installer
+bash install.sh
 ```
