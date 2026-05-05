@@ -1,165 +1,129 @@
-# API workflow and project structure
+# API workflow and architecture map
 
-This document explains how the frontend, backend, and `news` app interact, plus recommended reorganization steps for
-deployment to Vercel and Supabase.
+## Index
 
-Overview
+- [Overview](#overview)
+- [End-to-end flow](#end-to-end-flow)
+- [API surface](#api-surface)
+- [Data source rules](#data-source-rules)
+- [Environment variables](#environment-variables)
+- [Deployment notes](#deployment-notes)
+- [Local development](#local-development)
 
-- Frontend: the React + Vite app under `/frontend`. It runs separately and calls the backend API using environment
-  variable `VITE_API_URL`.
-- Backend: the Django project in `/backend`. It exposes a REST API using Django REST Framework and currently hosts the
-  `news` app.
-- news: a Django app implementing the `NewsArticle` model, serializers, and views. It provides a read-only (currently)
-  API surface for articles.
+## Overview
 
-Current wiring
+GrowKnow is split into three runtime parts:
 
-- The frontend's `src/lib/api.ts` reads `VITE_API_URL` (defaults to `http://localhost:8000`) and can call endpoints such
-  as `${API_BASE}/api/news/articles/`.
-- The Django project mounts the `news` app under `/api/news/` (so articles are at `/api/news/articles/`).
-- The backend reads `SUPABASE_DB_URL` to connect to the Supabase (Postgres) database when deployed. Locally it falls
-  back to SQLite.
+- `frontend/` — React + Vite user interface.
+- `backend/` — Django REST API and admin.
+- `n8n/` — automation workflows that collect, filter, and push content into the backend.
 
-Why there are three folders
+The current architecture is intentionally decoupled:
 
-- `frontend`: UI code and client-side data access. This is deployed as a static site (Vite build) on Vercel.
-- `backend`: Django server that provides API endpoints, admin, and connects to the database.
-- `news`: a Django app inside `backend` that groups news-related models, serializers, and views. It's not a separate
-  backend; it's part of the Django backend.
+- The frontend renders the UI and fetches data over HTTP.
+- Django is the primary API source for articles and tools.
+- n8n acts as the ingestion layer and writes new content into Django.
 
-Recommended structure and goals
+## End-to-end flow
 
-1. Keep `frontend/` as a standalone static app that calls the backend API (hosted separately) or the same origin if you
-   use a serverless function.
-2. Keep `backend/` as a Django project. Move Django apps (`news`) inside `backend/` if you prefer a single Python
-   package layout (current layout is fine: `news` is top-level Django app alongside `backend`—optionally move into
-   `backend/` package).
-3. Configure CORS and environment variables so Vercel-hosted frontend can call the backend.
-4. Ensure the backend uses `SUPABASE_DB_URL` to connect to Supabase in production and create a `.env` or set Vercel
-   environment variables accordingly.
+### 1) Frontend requests data
 
-Deployment notes (Vercel + Supabase)
+- `frontend/src/lib/api.ts` reads `VITE_API_URL` and defaults to `http://localhost:8000` when not provided.
+- `frontend/src/lib/toolsApi.ts` uses the same base URL for tool data.
+- The frontend first tries Supabase when both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present.
+- If Supabase is not configured, unavailable, or fails, the frontend falls back to the Django API.
 
-- Frontend: deploy the `frontend` directory on Vercel. Set environment variables in Vercel:
-    - VITE_API_URL -> https://<your-backend-url> (pointing to your backend deployment or serverless function)
-    - VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY if you use Supabase directly from the frontend.
+### 2) Django serves the API
 
-- Backend: deploy Django separately (e.g., Render, Fly, Railway) or convert Django API to serverless functions (more
-  work). Configure environment variables:
-    - DJANGO_SECRET_KEY
-    - DJANGO_DEBUG=false
-    - SUPABASE_DB_URL=postgres://user:pass@host:port/dbname
-    - CORS_ALLOWED_ORIGINS (include your Vercel site URL)
+- The Django project mounts the `news` app under `/api/news/`.
+- Read endpoints are handled by Django REST Framework view classes in `backend/news/views.py`.
+- A top-level health endpoint is exposed at `/health/`.
 
-API endpoints
+### 3) n8n ingests external content
 
-- GET /api/news/articles/ -> list articles
-- GET /api/news/articles/{id}/ -> article detail
+The automation workflow in `n8n/workflow.json` runs on a schedule and follows this path:
 
-Next steps I will perform now
+1. Fetch RSS from the external AI news feed.
+2. Convert XML to JSON.
+3. Split items into individual articles.
+4. Use Ollama to classify whether each item is AI/ML-related.
+5. Keep only the positive matches.
+6. Format the payload for Django.
+7. POST the result to the backend article endpoint.
 
-- Add a `.env.example` showing relevant env vars.
-- Add `README.md` summary in project root with short deployment instructions.
-- Run `python manage.py check` to verify Django imports and routing are valid.
+For a dedicated breakdown of the automation, see `docs/n8n_workflow.md`.
 
+## API surface
 
-# start backend
+### News articles
 
+- `GET /api/news/articles/` — list articles
+- `GET /api/news/articles/{id}/` — article detail
+
+### Tools
+
+- `GET /api/news/tools/` — list tools
+- `GET /api/news/tools/{id}/` — tool detail
+
+### Health
+
+- `GET /health/` — basic app and database connectivity check
+
+## Data source rules
+
+Current read order in the frontend:
+
+1. Supabase, when configured and reachable.
+2. Django API at `VITE_API_URL`.
+
+This keeps Supabase optional while preserving Django as the supported API path.
+
+## Environment variables
+
+### Frontend
+
+- `VITE_API_URL` — base URL for the backend API.
+- `VITE_SUPABASE_URL` — optional Supabase project URL.
+- `VITE_SUPABASE_ANON_KEY` — optional Supabase anonymous key.
+
+### Backend
+
+- `DJANGO_SECRET_KEY`
+- `DJANGO_DEBUG`
+- `SUPABASE_DB_URL` — production Postgres connection string when using Supabase.
+- `CORS_ALLOWED_ORIGINS` — include the deployed frontend origin.
+
+## Deployment notes
+
+### Frontend deployment
+
+- Deploy `frontend/` as a static site.
+- Point `VITE_API_URL` to the deployed Django backend.
+- Add Supabase variables only if you want the frontend to use Supabase directly as an optional read source.
+
+### Backend deployment
+
+- Deploy Django separately from the frontend.
+- Configure CORS so the frontend domain can access the API.
+- Use `SUPABASE_DB_URL` in production and SQLite locally.
+
+### Automation deployment
+
+- Run n8n with the provided Docker Compose setup.
+- Ensure n8n can reach Ollama and Django from inside the container.
+- The workflow uses `host.docker.internal` for both Ollama and the backend API.
+
+## Local development
+
+From the project root:
+
+```bash
 python manage.py runserver
+```
 
-# from frontend/
+From `frontend/`:
 
+```bash
 npm install
 npm run dev
-
-start frontend
-
-# SQL schema for NewsArticle table
-
-CREATE TABLE IF NOT EXISTS public.news_newsarticle (
-id bigserial PRIMARY KEY,
-title varchar(255) NOT NULL,
-content text NOT NULL,
-url varchar(500) NOT NULL,
-source_url varchar(500),
-source_name varchar(255),
-source_favicon varchar(500),
-status varchar(2) NOT NULL DEFAULT 'DR',
-created_at timestamptz NOT NULL DEFAULT now(),
-published_at timestamptz,
-author bigint, -- nullable; 
-relevance_score double precision NOT NULL DEFAULT 0.0,
-industry_tags jsonb NOT NULL DEFAULT '[]'::jsonb,
-categories jsonb NOT NULL DEFAULT '[]'::jsonb,
-vendors jsonb NOT NULL DEFAULT '[]'::jsonb
-);
-
--- Optional: small index to speed published queries
-CREATE INDEX IF NOT EXISTS idx_news_published_at ON public.news_newsarticle (published_at);
-
-
---- 
-CREATE TABLE public.news_auditlog (
-id BIGSERIAL PRIMARY KEY,
-action VARCHAR(100) NOT NULL,
-timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
-actor_id BIGINT NULL, -- optional reference to auth_user.id
-article_id BIGINT NULL -- optional reference to news_newsarticle.id
-);
-
-## insert into NewsArticle
-
-INSERT INTO public.news_newsarticle
-(title, content, url, source_url, source_name, source_favicon, industry_tags, categories, vendors, published_at, status)
-VALUES
-(
-'OpenAI Releases GPT-5',
-'OpenAI announces GPT-5...',
-'https://example.com/openai-gpt5',
-'https://openai.com',
-'OpenAI Blog',
-'https://openai.com/favicon.ico',
-'["GPT-5", "Language Model"]'::jsonb,
-'["Product", "Research"]'::jsonb,
-'["OpenAI"]'::jsonb,
-'2025-10-28T10:30:00Z'::timestamptz,
-'PB'
-);
-
-# SQL schema for news_tool table
-
-CREATE TABLE IF NOT EXISTS public.news_tool (
-id bigserial PRIMARY KEY,
-name varchar(255) NOT NULL,
-description text,
-url varchar(1000),
-logo varchar(1000),
-category varchar(255),
-subcategories jsonb NOT NULL DEFAULT '[]'::jsonb,
-pricing varchar(100),
-price_from numeric(10,2),
-rating double precision,
-tags jsonb NOT NULL DEFAULT '[]'::jsonb,
-raw_payload jsonb,
-created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_tools_category ON public.news_tool (category);
-
-## insert into news_tool
-
-INSERT INTO public.news_tool
-(name, description, url, logo, category, subcategories, pricing, price_from, rating, tags)
-VALUES
-(
-'Taskade',
-'AI-powered productivity workspace with task management, notes, and collaboration tools.',
-'https://taskade.com',
-'https://via.placeholder.com/60',
-'AI Productivity Tools',
-'["Task Management","Collaboration"]'::jsonb,
-'Freemium',
-8,
-4.3,
-'["Productivity","Tasks","Collaboration"]'::jsonb
-);
+```
