@@ -1,6 +1,22 @@
+from html import unescape
+
+from django.utils.html import strip_tags
 from rest_framework import serializers
 from .models import NewsArticle, Tool
 from .adapters import SourceMetadataAdapter
+
+
+def _summary_to_plain_text(value):
+    if not isinstance(value, str):
+        return value
+
+    cleaned = value
+    # Decode entities twice to handle encoded HTML like "&lt;p&gt;...&lt;/p&gt;".
+    for _ in range(2):
+        cleaned = unescape(cleaned)
+
+    cleaned = strip_tags(cleaned)
+    return ' '.join(cleaned.split())
 
 
 class NewsArticleSerializer(serializers.ModelSerializer):
@@ -61,6 +77,11 @@ class NewsArticleSerializer(serializers.ModelSerializer):
         # Pattern (Adapter): delegate source-shape conversion to SourceMetadataAdapter.
         # Benefit: source mapping rules are reusable and easier to change in one place.
         return SourceMetadataAdapter.from_article(obj)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['summary'] = _summary_to_plain_text(data.get('summary', ''))
+        return data
 
 
 class ToolSerializer(serializers.ModelSerializer):

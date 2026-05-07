@@ -1,6 +1,5 @@
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { Link } from "react-router-dom";
 
 export default function About() {
   return (
@@ -63,8 +62,18 @@ export default function About() {
           <section style={{ marginTop: "2rem", display: "flex", gap: "1rem", alignItems: "center" }}>
             <div>
               <p style={{ color: "white", margin: 0 }}>
-                  <strong>Want more detail about the team and our process? Read our <Link to="https://knowgrow7.wordpress.com/">Blog</Link>
-                , where we explain decisions, publish updates, and share behind-the-scenes notes.</strong>
+                <strong>
+                  Want more detail about the team and our process? Read our
+                  <a
+                    href="https://knowgrow7.wordpress.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--accent)", marginLeft: "0.25rem" }}
+                  >
+                    Blog
+                  </a>
+                  , where we explain decisions, publish updates, and share behind-the-scenes notes.
+                </strong>
               </p>
               <p style={{ color: "var(--text-muted)", marginTop: "0.5rem" }}>
                 To receive the most important AI updates in a compact, reliable format, subscribe to
@@ -74,7 +83,7 @@ export default function About() {
           </section>
 
           <p style={{ color: "var(--text-muted)", marginTop: "2rem" }}>
-            GrowNow Team
+            GrowKnow Team
           </p>
 
 
