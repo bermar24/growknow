@@ -32,6 +32,58 @@ import type { Article, FilterParams } from "./types";
 
 let cachedArticles: Article[] = [];
 
+function htmlToText(value: unknown): string {
+  if (typeof value !== 'string' || !value) return '';
+
+
+  // Best-effort DOM-based decode + tag stripping. Works in the browser.
+  try {
+    if (typeof document !== 'undefined') {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = value;
+      let text = tmp.textContent || '';
+
+      // If the decoded text still contains HTML-like tags (e.g. the source used
+      // HTML entities like `&lt;p&gt;...&lt;/p&gt;`), parse the decoded text
+      // again so those tags become actual nodes and their textContent can be
+      // extracted.
+      if (/[<>]/.test(text)) {
+        tmp.innerHTML = text;
+        text = tmp.textContent || '';
+      }
+
+      return text.replace(/\s+/g, ' ').trim();
+    }
+  } catch (e) {
+    // fall through to conservative fallback
+  }
+
+  // Fallback: remove tags and numeric entities roughly.
+  return String(value)
+    .replace(/<\/?p[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)))
+    .replace(/&(amp|lt|gt|quot|apos);/gi, (m) => {
+      switch (m.toLowerCase()) {
+        case '&amp;': return '&';
+        case '&lt;': return '<';
+        case '&gt;': return '>';
+        case '&quot;': return '"';
+        case '&apos;': return "'";
+        default: return '';
+      }
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeArticle(article: Article): Article {
+  return {
+    ...article,
+    summary: htmlToText(article.summary),
+  };
+}
+
 // Helper: try to create a Supabase client dynamically (so the project won't fail to build if
 // `@supabase/supabase-js` is not installed). Returns `null` when not configured/available.
 async function getSupabaseClient() {
@@ -66,7 +118,7 @@ async function loadArticles(): Promise<Article[]> {
 
       // Map the returned data to the Article[] shape if necessary. Assume DB columns
       // match the frontend `Article` type keys (title, summary, publishedAt, etc.).
-      cachedArticles = (data as any[]) || [];
+      cachedArticles = ((data as any[]) || []).map((article) => normalizeArticle(article as Article));
       return cachedArticles;
     } catch (err) {
       // If Supabase query fails, log and fall back to backend API.
@@ -80,7 +132,7 @@ async function loadArticles(): Promise<Article[]> {
     const res = await fetch(`${API_BASE}/api/news/articles/`);
     if (!res.ok) throw new Error('API fetch failed: ' + res.status);
     const data = await res.json();
-    cachedArticles = data as Article[];
+    cachedArticles = (data as Article[]).map(normalizeArticle);
     return cachedArticles;
   } catch (err) {
     throw new Error('Failed to load articles from backend API: ' + String(err));
